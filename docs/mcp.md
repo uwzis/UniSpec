@@ -40,15 +40,22 @@ UniSpec provides **26 built-in MCP tools** plus dynamic tools for each connector
 | `areas_default` | Set the default area | `unispec area default` |
 | `areas_health` | Show area health statistics | `unispec area health` |
 
-### Index/Link Management (5 tools)
+### Index/Link Management (14 tools)
 
 | MCP Tool | Description | CLI Equivalent |
 |----------|-------------|----------------|
 | `index_list` | List all index links (optional filters) | `unispec index list` |
 | `index_add` | Add a link between topic and path | `unispec index add` |
 | `index_remove` | Remove a link | `unispec index remove` |
-| `index_find` | Find links by topic or path | `unispec index find` |
+| `index_find` | Find links by topic, path, tag, or annotation | `unispec index find` |
 | `index_cleanup` | Remove orphaned links | `unispec index cleanup` |
+| `index_tags` | List all unique tags in index | `unispec index tags` |
+| `index_graph` | Export graph JSON for visualization | `unispec index graph` |
+| `index_backlinks` | Generate backlinks markdown for topic | `unispec index backlinks` |
+| `index_exports` | List exports (functions, classes) for a topic | `unispec index exports` |
+| `index_query` | Query exports by name, type, description, or ID | `unispec index query` |
+| `index_depends` | Find what topics depend on a given topic | `unispec index depends` |
+| `index_lookup` | Find export by full ID | `unispec index lookup` |
 
 ### Mode Management (4 tools)
 
@@ -96,6 +103,13 @@ Once your AI is connected, you can use natural language:
 "What files are linked to the authentication topic?"
 "Link src/auth/login.rs to the User Login topic"
 "Find all files linked to the payment topic"
+
+# Exports (Capability Registry)
+"What functions does user-login export?"
+"Find all functions named login"
+"Find exports matching 'authenticate'"
+"What topics depend on user-login?"
+"Find the export with ID user-login:login_user"
 
 # Modes
 "Switch to sprint mode"
@@ -367,8 +381,11 @@ If your tool supports MCP, add UniSpec:
 
 1. **Start simple** - Just `unispec init --cursor` to begin
 2. **Link everything** - Use `unispec index add` to connect code to specs
-3. **Run connectors** - Make AI run your tests and builds
-4. **Update specs** - AI works better with accurate specs
+3. **Add exports** - Declare what your topic provides using `--exports` when adding links
+4. **Query exports** - Use `index_exports` and `index_query` to find available functions without reading entire files
+5. **Use references** - When importing from another topic, use `# ref:index:topic:name` comments
+6. **Run connectors** - Make AI run your tests and builds
+7. **Update specs** - AI works better with accurate specs
 
 ---
 

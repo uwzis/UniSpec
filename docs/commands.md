@@ -470,17 +470,33 @@ unispec index add --topic <name> --path <path> [OPTIONS]
 | `-p, --path <path>` | File or directory path to link |
 | `-a, --area <area>` | Area name (auto-detected if not specified) |
 | `-l, --link_type <type>` | Type: 'file' or 'directory' (auto-detected) |
+| `--tags` | Tags (comma-separated) |
+| `--annotation` | Note about this link |
+| `--exports` | Export names (comma-separated) |
+| `--descriptions` | Export descriptions (comma-separated) |
+| `--export-types` | Export types (comma-separated: function,class,endpoint,model,service,config) |
+| `--signatures` | Function signatures (semicolon-separated) |
 
 **Example:**
 ```bash
 # Link a file to a topic
 unispec index add --topic "user-login" --path src/auth/login.rs
 
-# Link a directory to a topic
-unispec index add --topic "api-redesign" --path src/api/ --link_type directory
+# Link with tags
+unispec index add --topic "user-login" --path src/auth/login.rs --tags "auth,backend"
 
-# Specify area explicitly
-unispec index add --topic "feature-x" --path src/feature_x.rs -a Staging
+# Link with exports
+unispec index add --topic "user-login" --path src/auth/login.rs \
+  --exports "login_user,logout,validate_token" \
+  --descriptions "Authenticate user,Clear session,Verify token" \
+  --export-types "function,function,function"
+
+# Full example with signatures
+unispec index add --topic "user-login" --path src/auth/login.rs \
+  --exports "login_user" \
+  --descriptions "Authenticate and create session" \
+  --export-types "function" \
+  --signatures "fn login_user(email: String, pass: String) -> Result<User>"
 ```
 
 #### Remove
@@ -513,6 +529,7 @@ unispec index list [OPTIONS]
 |--------|-------------|
 | `-t, --topic <name>` | Filter by topic name |
 | `-p, --path <path>` | Filter by path |
+| `--tag <tag>` | Filter by tag |
 
 **Example:**
 ```bash
@@ -524,11 +541,14 @@ unispec index list --topic "user-login"
 
 # List links for specific path
 unispec index list --path src/auth/
+
+# List links with specific tag
+unispec index list --tag backend
 ```
 
 #### Find
 
-Find links by topic name or path.
+Find links by topic name, path, tag, or annotation.
 
 ```bash
 unispec index find <query> [OPTIONS]
@@ -536,11 +556,11 @@ unispec index find <query> [OPTIONS]
 
 | Argument | Description |
 |----------|-------------|
-| `query` | Topic name or path to search for |
+| `query` | Search query |
 
 | Option | Description |
 |--------|-------------|
-| `-b, --by <type>` | Search by: 'topic' or 'path' (default: topic) |
+| `-b, --by <type>` | Search by: 'topic', 'path', 'tag', or 'annotation' (default: topic) |
 
 **Example:**
 ```bash
@@ -549,6 +569,12 @@ unispec index find "user-login" --by topic
 
 # Find links by path
 unispec index find "src/auth" --by path
+
+# Find links by tag
+unispec index find "security" --by tag
+
+# Find links by annotation text
+unispec index find "password" --by annotation
 ```
 
 #### Full
@@ -566,6 +592,8 @@ Total links: 42
 Topics with links: 15
 Files linked: 38
 Directories linked: 4
+Unique tags: 8
+Total exports: 25
 ```
 
 #### Watch
@@ -594,6 +622,171 @@ unispec index cleanup
 ```bash
 # Clean up broken links
 unispec index cleanup
+```
+
+#### Exports
+
+List exports (functions, classes, etc.) for a topic or all topics.
+
+```bash
+unispec index exports [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-t, --topic <name>` | Topic name to list exports for |
+
+**Example:**
+```bash
+# List exports for a topic
+unispec index exports --topic user-login
+
+# List all exports across all topics
+unispec index exports
+```
+
+**Output:**
+```
+Exports for 'user-login':
+
+  login_user (function)
+    Description: Authenticate and create session
+    ID: user-login:login_user
+    Signature: fn login_user(email: String, pass: String) -> Result<User>
+
+  logout (function)
+    Description: Clear user session
+    ID: user-login:logout
+
+  validate_token (function)
+    Description: Verify JWT token
+    ID: user-login:validate_token
+```
+
+#### Query
+
+Query exports by name, type, description, or ID.
+
+```bash
+unispec index query <query> [OPTIONS]
+```
+
+| Argument | Description |
+|----------|-------------|
+| `query` | Search query |
+
+| Option | Description |
+|--------|-------------|
+| `-b, --by <type>` | Search by: 'name', 'type', 'description', or 'id' (default: name) |
+
+**Example:**
+```bash
+# Search by export name
+unispec index query "login" --by name
+
+# Search by type
+unispec index query "function" --by type
+
+# Search by description
+unispec index query "authenticate" --by description
+
+# Search by ID
+unispec index query "user-login" --by id
+```
+
+#### Depends
+
+Find what topics depend on a given topic (what other topics use its exports).
+
+```bash
+unispec index depends --topic <name>
+```
+
+| Option | Description |
+|--------|-------------|
+| `-t, --topic <name>` | Topic name to find dependents for |
+
+**Example:**
+```bash
+unispec index depends --topic user-login
+
+# Output:
+# Topics depending on 'user-login':
+#   checkout-flow
+#     - login_user (user-login:login_user)
+#     - validate_token (user-login:validate_token)
+```
+
+#### Lookup
+
+Find an export by its full ID.
+
+```bash
+unispec index lookup --id <export-id>
+```
+
+| Option | Description |
+|--------|-------------|
+| `-i, --id <id>` | Full export ID (format: topic:name, e.g., user-login:login_user) |
+
+**Example:**
+```bash
+unispec index lookup --id user-login:login_user
+
+# Output:
+# Found: user-login:login_user
+#   Name: login_user
+#   Type: function
+#   Topic: user-login
+#   Path: src/auth/login.rs
+#   Description: Authenticate and create session
+```
+
+#### Backlinks
+
+Generate a backlinks file showing what links to a topic.
+
+```bash
+unispec index backlinks --topic <name>
+```
+
+| Option | Description |
+|--------|-------------|
+| `-t, --topic <name>` | Topic name |
+
+**Example:**
+```bash
+unispec index backlinks --topic user-login
+```
+
+#### Tags
+
+List all unique tags in the index.
+
+```bash
+unispec index tags
+```
+
+**Example:**
+```bash
+$ unispec index tags
+Tags in index:
+  auth (5 links)
+  backend (12 links)
+  security (3 links)
+```
+
+#### Graph
+
+Export index as graph JSON for visualization.
+
+```bash
+unispec index graph
+```
+
+**Example:**
+```bash
+unispec index graph > graph.json
 ```
 
 ---
