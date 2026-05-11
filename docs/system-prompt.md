@@ -131,9 +131,10 @@ queue_add {topic: "feature-name", position: 0}
 
 ### Topics
 A **topic** is a unit of work - a feature, bug fix, or project. Each topic lives in one area and contains:
-- `spec.md` - The specification document
-- `task.md` - The task list with completion status
-- Notes section at bottom of task.md
+- `spec.md` - The specification document (human-authored, authoritative)
+- `tasks.toml` - The authoritative task state (machine-owned)
+- `task.md` - Derived rendering of `tasks.toml` (regenerated; do not edit directly)
+- `notes.md` - Optional human notes
 
 ### The Index
 The **index** tracks relationships between specs and code files:
@@ -143,9 +144,13 @@ The **index** tracks relationships between specs and code files:
 - Full graph visualization available
 
 ### The Queue
-The **queue** (`queue.md`) is an ordered list of topics to work on:
+The **queue** is an ordered list of topics to work on, stored in
+`.unispec/state.toml::queues.<Area>`:
 - Prioritized work list
 - Topics can be added, removed, reordered
+- The legacy `queue.md` is read once on first write into the area's queue
+  for backward compatibility, then ignored. New writes never touch
+  `queue.md`.
 
 ---
 
@@ -164,17 +169,17 @@ The **queue** (`queue.md`) is an ordered list of topics to work on:
 - `topics_progress [area]` - Show completion progress across topics
 
 ### Spec & Tasks
-- `spec_add {topic, area}` - Create *_spec.md and *_task.md from templates (area: Staging)
-- `spec_read {topic, area}` - Read spec content (area: Staging)
-- `spec_write {topic, area, content}` - Write spec content
-- `task_read {topic, area}` - Read task content (area: Staging)
-- `task_write {topic, area, content}` - Write full task content
-- `task_status {topic, area, status}` - Update task status: pending, working, or complete
+- `spec_add {topic, area}` - Create canonical `spec.md` + empty `tasks.toml` + derived `task.md`
+- `spec_read {topic, area}` - Read spec content
+- `spec_write {topic, area, content}` - Write `spec.md`. Rejects runtime-state frontmatter (`status`, `checked_out`, `checked_out_at`).
+- `task_read {topic, area}` - Read derived task content (rendered from `tasks.toml`)
+- `task_write {topic, area, content}` - One-shot importer for legacy markdown task lists. Refuses (`LegacyFormat:`) once the topic is on the canonical layout — use `task_status` per task instead.
+- `task_status {topic, area, task_id, status}` - Mutate one task in `tasks.toml` and regenerate `task.md`. Status: `pending | in_progress | complete | blocked`. Legacy `working` accepted as alias for `in_progress`.
 - `tasks_list {topic, area}` - List all tasks with status
 
 ### Notes
-- `notes_read {topic, area}` - Read notes section from task.md
-- `notes_add {topic, note, area}` - Add a note to notes section
+- `notes_read {topic, area}` - Read this topic's `notes.md`
+- `notes_add {topic, note, area}` - Append a note to `notes.md`
 
 ### Queue (Ordered Work List)
 - `queue_list [area]` - List ordered queue of topics (area: Staging)
@@ -272,28 +277,35 @@ topics_progress {area: "Working"}
 
 ## File Structure
 
+Canonical Phase 1 layout:
+
 ```
-spec/
-├── area.md                    # Area metadata (optional)
-├── master.md                  # Project master spec (optional)
-├── queue.md                   # Ordered work queue
-├── Staging/
-│   └── topic-name/
-│       └── spec.md, task.md
-├── Working/
-│   └── topic-name/
-│       ├── spec.md
-│       └── task.md
-├── Testing/
-├── Fixing/
-└── Build/
+project/
+├── spec/
+│   └── <Area>/
+│       └── <topic>/
+│           ├── topic.md       # narrative + frontmatter (human-authored)
+│           ├── spec.md        # authoritative spec (human-authored)
+│           ├── tasks.toml     # authoritative task state (machine-owned)
+│           ├── task.md        # DERIVED — generated from tasks.toml
+│           └── notes.md       # OPTIONAL — human notes
+└── .unispec/
+    └── state.toml             # runtime state: queues, ownership, locks, mode
 ```
+
+Filenames are infrastructure-level constants in Phase 1. `spec.md`,
+`tasks.toml`, and `task.md` are the canonical names regardless of which
+mode or area the topic lives in. Legacy `<topic>_spec.md`, `<topic>_task.md`,
+`specs.md`, and per-area `queue.md` files are still readable for
+compatibility but are never written by current handlers.
 
 ---
 
 ## Notes
-- Task indices are 0-based (first task is index 0)
-- Area names are case-insensitive internally
-- The queue defaults to showing topics by modification date if queue.md doesn't exist
-- Always check the queue before starting new work
-- **Wait for write mode permission before creating files**
+- Task IDs (e.g. `1.1`, `2.3`) are stable identifiers in `tasks.toml`.
+- Area names are case-insensitive internally.
+- The queue lives in `.unispec/state.toml::queues.<Area>`, not in
+  `queue.md`. On first queue mutation per area, any existing legacy
+  `queue.md` is imported once and then ignored.
+- Always check the queue before starting new work.
+- **Wait for write mode permission before creating files.**

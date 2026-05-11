@@ -123,16 +123,24 @@ unispec init --root /path/to/project
 │   │   └── area.md
 │   └── Build/
 │       └── area.md
-└── .agent/
-    ├── config.toml
-    ├── skill.md
-    ├── modes/
-    │   └── simple/
-    └── workflows/
-        ├── osdd:spec.md
-        ├── osdd:build.md
-        └── osdd:verify.md
+├── .agent/
+│   ├── config.toml
+│   ├── skill.md
+│   ├── modes/
+│   │   └── simple/
+│   └── workflows/
+│       ├── spec.md
+│       ├── build.md
+│       ├── test.md
+│       ├── verify.md
+│       └── ingest.md
+└── .unispec/
+    └── state.toml         # runtime state: queues, ownership, locks
 ```
+
+Each topic created later under `spec/<Area>/<Topic>/` follows the
+canonical Phase 1 layout: `topic.md`, `spec.md`, `tasks.toml`,
+derived `task.md`, optional `notes.md`.
 
 ---
 
@@ -362,12 +370,19 @@ unispec topic show "User Authentication" --all
 ```
 
 **Multi-Area Topic Notes:**
-When a topic has been pushed between areas, it may contain files from multiple areas:
-- `specs.md` - copied from source area
-- `tasks_staging.md` - tasks from Staging area
-- `tasks_working.md` - tasks from Working area
+When a topic has been pushed between areas, each area copy keeps the
+canonical layout (`spec.md`, `tasks.toml`, derived `task.md`,
+optional `notes.md`). Filenames are infrastructure-level constants in
+Phase 1 and are the same in every area; the area is encoded by the
+parent directory, not by the filename.
 
-Use `--from` to view specific area's files, or `--all` to see everything.
+Use `--from` to view a specific area's copy, or `--all` to see every
+area copy.
+
+Older repositories may still contain legacy per-area filenames such as
+`<topic>_spec.md`, `<topic>_task.md`, `specs.md`, or `tasks_<area>.md`.
+These are read-compatible but never written; run `unispec migrate v1`
+to consolidate them into the canonical layout.
 
 #### Push
 
@@ -1113,9 +1128,13 @@ unispec ingest run src --languages rust,go
 **Output:**
 Based on `.agent/config.toml` `[ingest]` settings:
 - `output_format = "toml"` → saves to `spec/code_analysis.toml`
-- `output_format = "md"` → creates `specs.md`, `links.md`, `functions.md` files
+- `output_format = "md"` → creates supplementary markdown files
+  (e.g. `links.md`, `functions.md`) alongside the canonical `spec.md`
 - `output_format = "both"` → creates both TOML and MD files
 - `auto_index = true` → automatically adds to `spec/index.toml`
+
+Ingested topics use the same canonical layout as authored topics:
+`spec.md`, `tasks.toml`, derived `task.md`, optional `notes.md`.
 
 #### Watch
 

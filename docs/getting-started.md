@@ -61,7 +61,9 @@ my-project/
 │   ├── Staging/       # New specs start here
 │   ├── Working/       # Specs you're actively working on
 │   └── Build/         # Completed specs ready to deploy
-└── .agent/            # UniSpec configuration
+├── .agent/            # UniSpec configuration
+└── .unispec/          # Runtime state (queues, ownership, locks)
+    └── state.toml
 ```
 
 ### Step 3: Launch the Interactive Interface
@@ -116,20 +118,26 @@ What problem does this solve?
 2. Criterion 2
 ```
 
-### `tasks.md` - The Tasks
+### `tasks.toml` + `task.md` - The Tasks
 
-This lists the work to be done:
+`tasks.toml` is the authoritative task state for a topic (machine-owned).
+`task.md` is a human-readable rendering of `tasks.toml` and is regenerated
+automatically — never edit it by hand.
+
+You normally don't author `tasks.toml` directly. Use the MCP tools
+(`spec_add` to seed it, `task_status` to mutate one task at a time) and
+the renderer produces a `task.md` that looks like:
 
 ```markdown
 # Tasks - Feature Name
 
-## Implementation
-- [ ] Task 1
-- [ ] Task 2
+## Phase 1: Foundation
+- [ ] **1.1** Task 1
+- [ ] **1.2** Task 2
 
-## Testing  
-- [ ] Test 1
-- [ ] Test 2
+## Phase 5: Testing
+- [ ] **T1** Test 1
+- [ ] **T2** Test 2
 ```
 
 ---

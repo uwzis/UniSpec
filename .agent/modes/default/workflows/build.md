@@ -1,31 +1,29 @@
 # Workflow: /build
 
 ## Purpose
-Build topics from Staging. Topic MUST be listed in area queue.md to be pushable.
+Build topics from Staging. A topic MUST be listed in the target area's
+queue (stored in `.unispec/state.toml::queues.<Area>`) to be pushable.
 
 ## Key Requirements
 1. **CREATE /src FIRST** - Before writing any code, create /src at project root
 2. **ALL source files in /src** - At project root, NOT in topic directories
-3. **MUST be in queue** - Topic must be listed in area's queue.md to be pushable
-4. **Check off tasks** - After completing each task, mark it complete in task.md
+3. **MUST be in queue** - Topic must be listed in the area's queue
+   (`.unispec/state.toml`) to be pushable. Use `queue_*` MCP tools.
+4. **Check off tasks via `task_status`** - `task.md` is a derived
+   rendering of `tasks.toml`; never edit its checkboxes directly.
 5. **Add testing tasks last** - Add test tasks AFTER building, before Testing
-6. **queue.md deleted at Testing** - Normal behavior
+6. **Working queue entry cleared at Testing** - Normal behavior
 
-## Queue File Location
+## Queue Storage
 
-**The queue.md is in the AREA ROOT, not in topic folders:**
-```
-spec/
-├── Staging/
-│   └── queue.md    ← List of topics ready to push
-├── Working/
-│   └── queue.md    ← What to build next
-└── ...
-```
+The queue lives in `.unispec/state.toml::queues.<Area>`. Treat it as
+opaque structured state and only read/mutate it through the `queue_*`
+MCP tools — never write `queue.md` directly. Legacy `queue.md` files
+are imported once per area on first queue mutation and then ignored.
 
 ## Readiness Rule
 
-**Only topics listed in area queue.md can be pushed.**
+**Only topics listed in the target area's queue can be pushed.**
 
 Check:
 ```
@@ -35,7 +33,7 @@ queue_check {topic: "<topic-name>", area: "Staging"}
 ## Steps
 
 ### 1. Check Readiness - MUST be in queue
-- Topic must be listed in Staging/queue.md
+- Topic must be listed in the Staging queue (`state.toml::queues.Staging`)
 - Add to queue if not: `queue_add {topic, area: "Staging"}`
 
 ### 2. Create /src First
@@ -49,8 +47,9 @@ queue_check {topic: "<topic-name>", area: "Staging"}
 ### 4. Build in Working
 - Work through queue in ORDER
 - Create code in /src
-- Link every file to spec
-- **CHECK OFF EVERY TASK** - Mark complete as you go
+- Link every file to spec via `index_add`
+- **CHECK OFF EVERY TASK** via `task_status` (mutates `tasks.toml`,
+  regenerates `task.md`). Never hand-edit `task.md`.
 
 ### 5. Add Testing Tasks Before Testing
 - **ONLY add testing tasks here** - AFTER all implementation is done
@@ -59,7 +58,7 @@ queue_check {topic: "<topic-name>", area: "Staging"}
 
 ### 6. Push to Testing
 - When done, push to Testing
-- queue.md automatically deleted
+- The Working queue entry for this topic is cleared automatically
 
 ## File Placement
 
@@ -71,7 +70,9 @@ PROJECT ROOT/
 
 ## Important Notes
 
-- **Check off each task** - Don't skip! Mark tasks complete immediately
-- **Queue is in area root** - Not in topic folders
+- **Check off each task** - Don't skip! Use `task_status` immediately;
+  never edit `task.md` checkboxes directly (it's a derived file)
+- **Queue lives in `.unispec/state.toml`** - Not in topic folders, not
+  in `queue.md`
 - **Testing comes last** - Add test tasks after all implementation done
 - **NO testing in spec phase** - Only development tasks during SPEC workflow

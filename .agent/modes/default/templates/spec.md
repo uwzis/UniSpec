@@ -4,8 +4,16 @@ short: <Add a one-liner description here>
 created: <DateTime>
 modified: <DateTime>
 author: <Author>
-status: draft
 ---
+
+<!--
+spec.md is the human-authored specification.
+
+Runtime state (status, ownership, queue, locks) lives in `.unispec/state.toml`
+and per-task state lives in this topic's `tasks.toml`. Do NOT add `status:`,
+`checked_out:`, or `checked_out_at:` to this frontmatter — `spec_write` will
+reject them.
+-->
 
 # Design: <TopicName>
 

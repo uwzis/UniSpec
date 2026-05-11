@@ -19,31 +19,35 @@ A mode is a complete workflow configuration containing:
 ├── mode.toml          # Mode metadata and configuration
 ├── skill.md           # Agent persona
 ├── workflows/         # Workflow definitions
-│   ├── feature:spec.md
-│   ├── feature:build.md
-│   └── feature:verify.md
-├── areas/            # Area-specific templates (one per area)
+│   ├── spec.md
+│   ├── build.md
+│   └── verify.md
+├── areas/            # Area-specific area-description templates
 │   ├── staging/
-│   │   ├── specs.md     # Template for spec files in staging
-│   │   ├── tasks.md     # Template for task files in staging
 │   │   └── area.md      # Template for area description in staging
 │   ├── working/
-│   │   ├── specs.md
-│   │   ├── tasks.md
 │   │   └── area.md
 │   └── build/
-│       ├── specs.md
-│       ├── tasks.md
 │       └── area.md
-└── templates/        # Global fallback templates (if area not found)
-    ├── specs.md
-    ├── tasks.md
+└── templates/        # Topic-content templates
+    ├── topic.md
+    ├── spec.md
+    ├── task.md
     └── area.md
 ```
 
+**Filenames are infrastructure-level constants.**
+In Phase 1, every topic uses the canonical layout
+(`spec.md`, `tasks.toml`, derived `task.md`, optional `notes.md`)
+regardless of mode or area. Modes can vary their *content templates*
+(what goes inside `spec.md` and the seed shape of `task.md`) and their
+area metadata, but they cannot rename the files themselves.
+
 **Template lookup order:**
-1. First: `.agent/modes/<mode>/areas/<area>/<file>.md` (area-specific)
-2. Fallback: `.agent/modes/<mode>/templates/<file>.md` (global)
+1. First: `.agent/modes/<mode>/areas/<area>/area.md` (area-specific
+   description)
+2. Fallback: `.agent/modes/<mode>/templates/<file>.md` (mode-wide
+   topic / spec / task / area templates)
 
 ## Creating a Mode
 
@@ -86,37 +90,42 @@ connectors = true
 custom_workflows = true
 
 [templates]
-# Global template file names (fallback if area-specific not set)
-spec_file = "specs.md"
-task_file = "tasks.md"
+# Canonical filenames are infrastructure-level constants in Phase 1.
+# Every topic gets `spec.md`, `tasks.toml`, derived `task.md`, and the
+# area gets `area.md`. These names are fixed across modes and areas;
+# the values below exist for legacy compatibility only and should not
+# be changed.
+spec_file = "spec.md"
+task_file = "task.md"
 area_file = "area.md"
 
-# Use area-specific templates if they exist, fallback to global templates
+# Use the per-area `area.md` template if present, otherwise fall back
+# to the mode-wide template under `templates/`.
 use_area_templates = true
-
-# Per-area template file names (inline in [templates] section)
-# Output file names - these define what files are created in topics
-staging-spec-file = "specs_staging.md"
-staging-task-file = "tasks_staging.md"
-staging-area-file = "area_staging.md"
-
-working-spec-file = "specs_working.md"
-working-task-file = "tasks_working.md"
-working-area-file = "area_working.md"
 ```
 
 ### Template Configuration
 
 The `[templates]` section controls:
 
-1. **Global template names** - Default file names for specs, tasks, and area files
-2. **use_area_templates** - Whether to use area-specific templates from `.agent/modes/<mode>/areas/<area>/`
-3. **Per-area file names** - Custom output file names per area (e.g., `tasks_staging.md` vs `tasks_working.md`)
+1. **Canonical filenames** - `spec.md` / `task.md` / `area.md` are fixed
+   and the same in every mode and every area. Modes customize *content*,
+   not filenames.
+2. **`use_area_templates`** - Whether to use area-specific templates from
+   `.agent/modes/<mode>/areas/<area>/area.md`. Topic content templates
+   (`topic.md`, `spec.md`, `task.md`) live under
+   `.agent/modes/<mode>/templates/`.
 
 **How it works:**
-- Templates are read from `.agent/modes/<mode>/areas/<area>/specs.md`, `tasks.md`, `area.md`
-- Topics are created with output file names from `staging-spec-file`, `staging-task-file`, etc.
-- When pushing between areas, source files are kept and target area files are created from target templates
+- Area description templates are read from
+  `.agent/modes/<mode>/areas/<area>/area.md`.
+- Topic content templates (`topic.md`, `spec.md`, `task.md`) are read
+  from `.agent/modes/<mode>/templates/`.
+- Topics are always created using the canonical filenames
+  (`spec.md`, `tasks.toml`, derived `task.md`).
+- When pushing between areas, the source area copy is kept and the
+  target area copy uses the same canonical filenames; `tasks.toml`
+  remains the authoritative task store per-area-copy.
 
 ### 3. Create skill.md
 
@@ -335,11 +344,11 @@ description = "Default mode with Spec-Driven Development workflows. Staging: spe
 version = "1.0.0"
 
 [author]
-name = "OpenSDD Team"
-contact = "https://github.com/osdd"
+name = "UniSpec Team"
+contact = "https://github.com/uwzis/UniSpec"
 
 [requirements]
-min_osdd_version = "0.9.0"
+min_unispec_version = "0.0.7"
 
 [areas]
 default = ["Staging", "Working", "Build"]

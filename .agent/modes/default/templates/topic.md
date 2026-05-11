@@ -14,9 +14,10 @@ author: <Author>
 
 ## Specs
 
-List of specs in this topic:
-- `xxx_spec.md`: [Description]
-- `yyy_spec.md`: [Description]
+Each topic owns a single canonical `spec.md` (authoritative human-written
+specification) and a derived `task.md` rendered from `tasks.toml`. If this
+topic decomposes into sub-topics, list them below; each sub-topic is its
+own directory with its own `spec.md` / `tasks.toml` / `task.md`.
 
 ## Sub-topics
 

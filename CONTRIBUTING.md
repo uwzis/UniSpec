@@ -1,12 +1,12 @@
-# Contributing to OpenSDD
+# Contributing to UniSpec
 
-Thank you for your interest in contributing to OpenSDD! This document outlines how you can help.
+Thank you for your interest in contributing to UniSpec! This document outlines how you can help.
 
 ## Ways to Contribute
 
 ### 1. Create a Mode
 
-Modes are the heart of OpenSDD. Create your own:
+Modes are the heart of UniSpec. Create your own:
 
 ```bash
 # Structure
@@ -38,7 +38,7 @@ When reporting bugs, include:
 - OS and version
 - Steps to reproduce
 - Expected vs actual behavior
-- OpenSDD version (`osdd --version`)
+- UniSpec version (`unispec --version`)
 
 ### 4. Feature Requests
 
@@ -59,8 +59,8 @@ We love feature requests! Please describe:
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourname/osdd.git
-cd osdd
+git clone https://github.com/uwzis/UniSpec.git
+cd UniSpec
 
 # Build
 cargo build

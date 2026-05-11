@@ -57,7 +57,6 @@ spec_add {topic: "auth/login", area: "Staging", content: "---
 title: auth/login
 created: 2026-04-08 10:00:00
 author: Your Name
-status: draft
 ---
 
 # Design: auth/login
@@ -112,14 +111,7 @@ status: draft
 
 - [ ] [Criterion 1]
 - [ ] [Criterion 2]
-", task_content: "---
-spec: auth/login
-created: 2026-04-08
-status: pending
-date: 2026-04-08
----
-
-# Tasks: auth/login
+", task_content: "# Tasks: auth/login
 
 ## Implementation
 
@@ -134,20 +126,14 @@ date: 2026-04-08
 
 ### Phase 4: Polish
 - [ ] **4.1** [Polish task - e.g., Add error handling]
-
-## Notes
-
-<!-- Implementation notes, decisions, and blockers -->
-
-<!--
-Date format: YYYY-MM-DD
-Example:
-**2024-01-15**: Chose approach A over B because X
--->
 "}
 ```
 
-**Constraint: Follow the task.md template EXACTLY. Only create IMPLEMENTATION tasks - NO testing tasks!**
+**Constraint: Provide markdown task content matching the four phases shown.
+`spec_add` parses this markdown into the topic's authoritative `tasks.toml`
+and regenerates the derived `task.md` from it. Do NOT include task-status
+frontmatter — runtime state lives in `tasks.toml`, not in `task.md`. Only
+create IMPLEMENTATION tasks - NO testing tasks!**
 
 ---
 
@@ -187,7 +173,7 @@ spec_add {topic: "auth/login", area: "Staging", content: "...", task_content: ".
 2. **ALWAYS start with topics**
 3. **Use MCP tools** - topics_add, spec_add with content/task_content params
 4. **Create + Fill = ONE action** - Never separate them
-5. **Follow templates EXACTLY** - Use the spec.md and task.md template structure
+5. **Follow templates EXACTLY** - Use the `spec.md` and `task.md` template structure. `task.md` is a derived rendering of `tasks.toml`; only its content shape matters here.
 6. **One at a time** - Complete one piece before starting the next
 7. **Use nested topics with `/`**
 8. **NO TESTING TASKS** - Only create IMPLEMENTATION tasks. Testing is handled in the BUILD phase.
