@@ -1,94 +1,117 @@
 # Workflow: /spec
 
-**YOUR ONLY JOB: Create specs and tasks using the templates. Don't write code.**
+**Goal:** Translate a discussed idea into a concrete topic + spec + task list
+inside UniSpec. Do not write source code in this workflow.
 
 ---
 
-## 🔴 STRICT RULE: READ TEMPLATES FIRST!
+## Hard Rule
 
-**Before creating any topic, spec, or task, you MUST read the template files first.**
-
-The templates are located in:
-- `.agent/modes/default/templates/topic.md`
-- `.agent/modes/default/templates/spec.md`
-- `.agent/modes/default/templates/task.md`
-- `.agent/modes/default/templates/area.md`
-
-Use `read_asset` to read these templates, then fill them in with actual content.
+Use MCP tools for every artifact under `spec/**`. Do not use `Write`/`Edit`
+on `topic.md`, `spec.md`, or `task.md` — MCP tools own those files and
+enforce frontmatter, validation, and queue integrity.
 
 ---
 
-## HOW TO USE THE TOOLS
+## Tools Used
 
-### Step 1: Read the Topic Template
+| Tool | Purpose |
+| --- | --- |
+| `topics_add` | Creates a topic directory with `topic.md` |
+| `spec_add` | Creates `spec.md` + `task.md` for a topic |
+| `read_asset` | Reads `topic.md` / `spec.md` / `task.md` for verification |
+| `queue_add` | Adds the topic to an area's readiness queue (required before `topics_push`) |
 
-```
-read_asset {
-  topic: "templates",
-  asset_type: "topic",
-  area: "default"
-}
-```
+---
 
-Then create a topic using topics_add with the template structure:
+## Steps
+
+### 1. Confirm the active area
+
+Default for new specs is `Staging`. If the user wants a different area,
+they must say so explicitly.
+
+### 2. Gather requirements before any tool call
+
+You MUST have the following before calling `topics_add` or `spec_add`. If
+any is missing, ask one targeted question per missing item:
+
+- **Functional Goal** — what does this do?
+- **Acceptance Criteria** — how do we know it works?
+- **Scope Boundaries** — what is explicitly out of scope?
+- **One-line Description** — fits in the `short` parameter.
+
+### 3. Create the topic with `topics_add`
+
+`topics_add` requires `topic`, `area`, `short`, and `content`. Pass the
+actual gathered information — never literal template placeholders.
+
+Concrete example (illustrative — substitute the user's real values):
 
 ```
 topics_add {
-  topic: "myproject",
+  topic: "auth-login",
   area: "Staging",
-  short: "A web application for managing tasks and projects",
-  content: "[Use the topic template structure - fill in ALL sections with real content]"
+  short: "JWT-based user login with refresh tokens",
+  content: "# auth-login\n\nLogin flow that issues short-lived access tokens and longer-lived refresh tokens. Handles password and OAuth providers."
 }
 ```
 
-**IMPORTANT**: 
-- `content` parameter is REQUIRED and must have at least 20 characters of actual content
-- `short` parameter is REQUIRED for TUI display
-- The MCP tool will auto-add frontmatter - just provide the body content
+The MCP server adds `title`, `created`, and `author` frontmatter
+automatically. Do not include those fields in `content`.
+
+### 4. Create the spec + initial task list with `spec_add`
+
+`spec_add` requires `topic`, `area`, `short`, `spec_content`, and
+`task_content`. Both content fields must contain real, detailed text —
+not placeholders.
+
+`spec_content` covers:
+
+- Problem statement
+- Functional requirements
+- Acceptance criteria
+- Out of scope
+
+`task_content` is a checklist of implementation tasks. **No testing
+tasks here** — testing tasks are added in the `/build` workflow after
+implementation lands.
+
+### 5. Verify
+
+Call `read_asset` for each of `topic`, `spec`, and `task` and confirm
+the files contain what you sent. Report any divergence to the user
+rather than silently retrying.
+
+### 6. (Optional) Queue the topic
+
+If the user wants the topic ready to push to `Working`, call:
+
+```
+queue_add { topic: "auth-login", area: "Staging" }
+```
+
+`topics_push` is gated by the area's queue; without `queue_add`, the
+push will be rejected.
 
 ---
 
-### Step 2: Read the Spec and Task Templates
+## Definition of Done
 
-```
-read_asset {
-  topic: "templates",
-  asset_type: "spec",
-  area: "default"
-}
-```
-
-Then create a spec + tasks using spec_add:
-
-```
-spec_add {
-  topic: "myproject/auth",
-  area: "Staging",
-  short: "User authentication with JWT tokens",
-  spec_content: "[Use the spec template structure - fill in ALL sections with real content]",
-  task_content: "[Use the task template structure - fill in ALL sections with real content]"
-}
-```
+- `topics_show { topic: "<name>", area: "Staging" }` returns the topic.
+- `read_asset { topic: "<name>", asset_type: "spec" }` returns the spec
+  body you sent.
+- `read_asset { topic: "<name>", asset_type: "task" }` returns the task
+  list you sent.
+- No literal `[Fill this in]` / `[Use the template structure]` strings
+  exist anywhere in the returned files.
 
 ---
 
-## KEY POINTS
+## Forbidden in this workflow
 
-1. **Read templates first** - Don't guess the structure, read the template files
-2. **Follow template exactly** - Don't change the structure
-3. **Fill in all placeholders** - Write actual content in each section
-4. **No testing tasks** - The task template only has 4 phases (Foundation, Core Features, Integration, Polish)
-5. **Use MCP tools** - topics_add and spec_add will auto-add frontmatter including `short`
-6. **ALWAYS include `short` parameter** - This is required for the TUI display!
-7. **Use `spec_content`** - Use `spec_content` NOT `content` for spec_add!
-8. **content is REQUIRED** - topics_add requires meaningful content (20+ characters)
-
----
-
-## ASK IF UNSURE
-
-If you don't know what to write, ASK the user:
-- "What should this feature do?"
-- "What are the must-have requirements?"
-- "What does success look like?"
-- "What's a one-line description for this?"
+- Writing code or modifying anything under `/src`.
+- Using `Write` / `Edit` directly on `spec/**`.
+- Submitting placeholder strings (`[…]`, `TBD`, `xxx`) as actual
+  `content` / `spec_content` / `task_content` parameters.
+- Adding testing tasks to `task_content` — those belong to `/build`.

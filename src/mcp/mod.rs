@@ -244,13 +244,13 @@ pub fn get_tools() -> Vec<Tool> {
         },
         Tool {
             name: "task_status".to_string(),
-            description: "Update task status (pending, working, complete)".to_string(),
+            description: "Update the TOPIC-LEVEL status field (pending|working|complete). This sets a status for the whole topic, not for an individual task. To mark a single task in the topic's task list, use `tasks_complete` or `tasks_incomplete` with a `task_index` instead.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "topic": { "type": "string", "description": "Topic name" },
                     "area": { "type": "string", "description": "Area name (default: Staging)" },
-                    "status": { "type": "string", "description": "Status: pending, working, or complete" }
+                    "status": { "type": "string", "description": "Topic-level status: 'pending', 'working', or 'complete'" }
                 },
                 "required": ["topic", "status"]
             }),
