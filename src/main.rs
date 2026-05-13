@@ -154,11 +154,44 @@ fn main() -> Result<()> {
 
             let root_path = root.as_deref().unwrap_or_else(|| std::path::Path::new("."));
 
-            if !editors.is_empty() {
-                let results = init_editor::run_init_editors(root_path, &editors)?;
+            // Always lay down the spec/, .agent/, constitution etc. first.
+            init::run_init(root.as_deref())?;
+
+            // Native per-tool format adapters take priority over the legacy
+            // init_editor copy-loop for the four target tools.
+            let native_flags = ["claude-code", "cursor", "windsurf", "cline"];
+            let (native_editors, legacy_editors): (Vec<&str>, Vec<&str>) = editors
+                .iter()
+                .copied()
+                .partition(|e| native_flags.iter().any(|f| f == e));
+
+            for flag in &native_editors {
+                if let Some(adapter) = crate::agent::integrations::find_adapter(flag) {
+                    match crate::agent::integrations::write_adapter_for_project(
+                        &*adapter, root_path,
+                    ) {
+                        Ok(files) => println!(
+                            "  ✓ {}: {} file(s) written under {}",
+                            adapter.name(),
+                            files.len(),
+                            adapter.output_dir()
+                        ),
+                        Err(e) => eprintln!("  ✗ {}: {}", adapter.name(), e),
+                    }
+                }
+            }
+
+            if !legacy_editors.is_empty() {
+                let results = init_editor::run_init_editors(root_path, &legacy_editors)?;
                 init_editor::print_editor_results(&results);
-            } else {
-                init::run_init(root.as_deref())?;
+            }
+
+            // Generic AGENTS.md fallback — always written so any AI tool that
+            // honours AGENTS.md has a universal entry point. Skipped silently
+            // if the file already exists.
+            match crate::agent::integrations::write_generic_adapter(root_path) {
+                Ok(path) => println!("  ✓ Generic (AGENTS.md): {}", path.display()),
+                Err(e) => eprintln!("  ✗ AGENTS.md: {}", e),
             }
         }
         Some(Commands::Set { area }) => {
