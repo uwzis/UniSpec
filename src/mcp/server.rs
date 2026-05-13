@@ -1143,6 +1143,29 @@ fn call_tool(name: &str, args: &Value) -> Result<Value> {
                 "task_file": out.task_file
             }))
         }
+        // === Constitution ===
+        "constitution_read" => {
+            let content = crate::commands::constitution::read_constitution()?;
+            let path = crate::commands::constitution::constitution_path();
+            Ok(json!({
+                "success": true,
+                "path": path.display().to_string(),
+                "content": content
+            }))
+        }
+        "constitution_check" => {
+            let action = args
+                .get("action")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("constitution_check requires 'action'"))?;
+            let out = crate::commands::constitution::check_against_constitution(action)?;
+            Ok(json!({
+                "success": true,
+                "action": out.action,
+                "constitution": out.constitution,
+                "note": out.note
+            }))
+        }
         // === Next (structured agent feed) ===
         "next" => {
             let topic = args

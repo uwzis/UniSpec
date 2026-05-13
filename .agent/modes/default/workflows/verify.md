@@ -29,6 +29,12 @@ There is no MCP tool named `unispec_auto_verify`, `unispec_query_relations`, `un
 
 ## Steps
 
+0. **Read the constitution.**
+   ```
+   constitution_read {}
+   ```
+   Verify that the changes you're about to verify do not violate any principle. If any do, flag them as ERROR findings in your verification report and refuse to push to Build until they're resolved.
+
 1. **Load context.**
    ```
    unispec_read_spec { topic: "<topic>", area: "<Testing or Working>" }

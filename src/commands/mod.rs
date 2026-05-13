@@ -1,6 +1,7 @@
 // src/commands/mod.rs
 pub mod area;
 pub mod change;
+pub mod constitution;
 pub mod index;
 pub mod next;
 pub mod ingest;

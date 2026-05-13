@@ -316,6 +316,26 @@ pub fn get_tools() -> Vec<Tool> {
                 "required": ["topic", "new_position"]
             }),
         },
+        // === Constitution ===
+        Tool {
+            name: "constitution_read".to_string(),
+            description: "Return the contents of `.agent/constitution.md` — the project's non-negotiable principles. Call this before any action that could violate governance.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        Tool {
+            name: "constitution_check".to_string(),
+            description: "Pair the constitution text with a proposed action so the agent can self-evaluate. Required: action (one-sentence description of what you're about to do).".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "action": { "type": "string", "description": "What the agent is about to do" }
+                },
+                "required": ["action"]
+            }),
+        },
         // === Next (structured agent feed) ===
         Tool {
             name: "next".to_string(),

@@ -43,6 +43,12 @@ If any precondition fails, run `/spec` and `queue_add` first.
    ```
    Read the full output. Follow `next_action` verbatim. If `blockers` is non-empty, resolve every blocker before proceeding (the blocker text names the tool to call). Treat `rules` as binding for this build pass. Re-call `next` after every meaningful state change (task completed, change archived, push) to get the updated next action.
 
+   **Then** read the constitution and verify your planned actions do not violate any principle:
+   ```
+   constitution_read {}
+   ```
+   If any planned action conflicts with a principle, stop and revise the plan before writing code.
+
 1. **Orient.**
    ```
    topics_list  { area: "Staging" }

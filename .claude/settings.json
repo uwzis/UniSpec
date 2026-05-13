@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/home/theeye/unispec-pr1/target/debug/unispec next *)"
+    ]
+  }
+}

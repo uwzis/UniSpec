@@ -17,6 +17,8 @@ Before every action on a topic, call `next { topic, area }` and read the full pa
 | Need | Tool | Notes |
 |------|------|-------|
 | **Decide what to do next** | `next { topic, area? }` | **Get structured next-action payload for a topic. Call this before every action to know what to do.** Returns `status`, `open_tasks`, `pending_changes`, `context_files`, `rules`, `next_action`, `blockers`. |
+| **Read project constitution** | `constitution_read {}` | Return `.agent/constitution.md` — non-negotiable principles. Read this on first contact with a project. |
+| **Check action against constitution** | `constitution_check { action }` | Pair the constitution with a proposed action so you can self-evaluate whether you'd violate any principle. |
 | Read a template | `read_asset { topic: "templates", asset_type: "topic"|"spec"|"task"|"area" }` | |
 | Read an artifact | `read_asset { topic, asset_type, area? }` or `unispec_read_spec { topic, area? }` | |
 | Create a topic | `topics_add { topic, area, short, content }` | `content` ≥ 10 chars. Don't include `---` — server writes it. |

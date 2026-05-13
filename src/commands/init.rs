@@ -146,6 +146,16 @@ pub fn run_init(root: Option<&std::path::Path>) -> Result<()> {
         fs::write(&modes_readme, MODES_README)?;
     }
 
+    // Constitution — non-negotiable project principles every agent must
+    // respect. Only written when missing so re-running init doesn't clobber
+    // amendments. Date placeholders are filled at write time.
+    let constitution_path = agent_root.join("constitution.md");
+    if !constitution_path.exists() {
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let body = CONSTITUTION_TEMPLATE.replace("<DATE>", &today);
+        fs::write(&constitution_path, body)?;
+    }
+
     println!(
         "
     ██╗   ██╗███╗   ██╗██╗    ███████╗██████╗ ███████╗ ██████╗
@@ -215,6 +225,34 @@ This is the {area} area. Replace this stub with a description of how topics beha
 
 - Document what kinds of work belong in this area.
 - Document what does not.
+"#;
+
+const CONSTITUTION_TEMPLATE: &str = r#"# Project Constitution
+
+This file defines the non-negotiable principles for this project. Every agent action must respect these principles. Violations block progression through the pipeline.
+
+## Core Principles
+
+### Principle 1: Spec Before Code
+No code may be written for a topic until it has a spec file in Working area.
+
+### Principle 2: Tests Required
+No topic may be pushed to Build without passing tests documented in the Testing area.
+
+### Principle 3: No Silent Failures
+All errors must be surfaced explicitly. No swallowing exceptions without logging.
+
+### Principle 4: Backward Compatibility
+No breaking changes to existing APIs without a MODIFIED Requirements delta in a change file.
+
+### Principle 5: One Topic One Concern
+Each topic must have a single clear responsibility. If a spec spans more than one concern, split it into multiple topics.
+
+## Governance
+
+Version: 1.0.0
+Ratified: <DATE>
+Last Amended: <DATE>
 "#;
 
 const MODES_README: &str = r#"# UniSpec Modes
