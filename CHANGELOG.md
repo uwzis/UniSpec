@@ -10,6 +10,78 @@ The current line of work lives on the `everything` branch. PR0 through PR7 are t
 
 ### Added
 
+#### `next` — structured agent feed
+
+A single MCP / CLI call that returns the agent's full decision context for a topic: status, open and completed tasks (with `from_change` attribution), pending and archived changes, context-file paths, area-specific rules, a one-sentence `next_action`, and any blockers. Closes the biggest gap vs. OpenSpec / spec-kit: agents no longer have to re-parse markdown to figure out what to do next.
+
+- **CLI:** `unispec next --topic <t> [--area <a>] [--json]` — human pretty-printer + JSON mode.
+- **MCP:** `next { topic, area? }` returns the full `NextOutput`.
+- **Shared module:** `src/commands/next.rs::run_next`. Composes `change_list`, task parsing, queue-readiness detection, and area-aware rule lookup.
+- **Prompts:** `unispec_basics.md` now declares "Hard rule: always call `next` first"; `build.md` and `unispec:spec.md` workflows gained a Step 0 telling the agent to call `next` before anything else.
+
+#### Delta merge on `change_archive`
+
+`change_archive` now reads delta sections from the change spec and merges them into the canonical `<topic>_spec.md` before moving the change to `changes/archive/`. Supported sections (case-insensitive `## <NAME> Requirements` headers):
+
+- `## ADDED Requirements` — appended to the canonical spec
+- `## MODIFIED Requirements` — replaces matching `### Requirement:` blocks
+- `## REMOVED Requirements` — deletes matching `### Requirement:` blocks
+- `## RENAMED Requirements` — `- FROM:` / `- TO:` lines rename in place
+
+Operations are applied in order RENAMED → REMOVED → MODIFIED → ADDED, matching OpenSpec semantics. Backward compatible: a change spec with no delta sections is archived without touching the canonical spec.
+
+Implemented in `src/commands/change.rs` (`parse_delta_spec`, `apply_delta`, `split_into_blocks`).
+
+#### Constitution file + MCP tools
+
+`unispec init` now writes `.agent/constitution.md` — a five-principle project rulebook (Spec Before Code, Tests Required, No Silent Failures, Backward Compatibility, One Topic One Concern) with a `Governance` section carrying `Version`, `Ratified`, `Last Amended`.
+
+- **MCP:** `constitution_read {}` returns the file's contents; `constitution_check { action }` pairs the constitution with a proposed action so the agent can self-evaluate.
+- **Workflows:** `build.md` Step 0 now reads the constitution; `verify.md` adds a Step 0 that treats constitution conflicts as ERROR findings blocking push to Build.
+- **Module:** `src/commands/constitution.rs`.
+
+#### `unispec analyze` — cross-artifact consistency checker
+
+Read-only static analyser for a topic's spec, task, and pending changes.
+
+- **CLI:** `unispec analyze --topic <t> [--area <a>] [--json]`.
+- **MCP:** `analyze { topic, area? }` returns findings[] with `ERROR / WARNING / INFO` severities plus counts.
+- **Checks:**
+  1. **Duplication** — requirements appearing in both the canonical spec and a pending change (outside `## MODIFIED Requirements`) → WARNING.
+  2. **Missing task coverage** — `### Requirement: X` rows with no task line referencing `X` → ERROR.
+  3. **Ambiguous language** — requirements containing words like `fast / secure / scalable / easy / simple / good / better / best / quick` without a numeric metric or unit token → WARNING.
+  4. **Empty sections** — `## <heading>` with no content before the next `##` → WARNING.
+  5. **Constitution alignment** — surfaces constitution version as INFO so agents are reminded to evaluate manually.
+  6. **Task completion** — overall `[x] / [ ]` ratio across main + pending change task files → INFO.
+- **Module:** `src/commands/analyze.rs`.
+
+#### Per-AI-tool format adapters
+
+`unispec init` now emits per-editor files through a real adapter trait instead of copying the same content everywhere.
+
+- **Trait:** `src/agent/integrations/mod.rs::IntegrationAdapter` with `name`, `cli_flag`, `output_dir`, `output_filename`, `format_skill`, `format_command`.
+- **Adapters shipped:**
+  - `ClaudeCodeAdapter` → `.claude/commands/unispec/<workflow>.md` with `name / description / category` frontmatter
+  - `CursorAdapter` → `.cursor/rules/unispec-<workflow>.mdc` with `description / globs / alwaysApply` frontmatter
+  - `WindsurfAdapter` → `.windsurf/workflows/unispec-<workflow>.md`
+  - `ClineAdapter` → `.clinerules/unispec-<workflow>.md`
+  - `GenericAdapter` → `AGENTS.md` (single file, one section per workflow)
+- **`AGENTS.md` is always written**, regardless of which editor flags were passed — universal fallback for any AI tool that honours it.
+
+The four "native" adapters take priority over the legacy `init_editor` copy loop for their matching flags; the other 20+ editor flags still flow through `init_editor`.
+
+#### Workspace / multi-repo coordination
+
+Basic multi-repo support so UniSpec can coordinate work across linked projects.
+
+- **CLI:**
+  - `unispec workspace init <name>` — writes `.unispec-workspace/workspace.yaml` (`name`, `version: 1`, `links: {}`).
+  - `unispec workspace link <name> <path>` — adds a named pointer to another UniSpec project.
+  - `unispec workspace list` — shows linked repos with path-exists / has-unispec status.
+  - `unispec workspace status [--json]` — combined topic list across every linked repo.
+- **MCP:** `workspace_status {}` returns the combined topic list as structured JSON.
+- **Module:** `src/commands/workspace.rs` (hand-rolled YAML reader/writer for the small fixed schema; no new dependencies).
+
 #### Change management (OpenSpec-inspired)
 
 A new way to propose features for an existing topic without overwriting its original spec. Changes live in a child folder under the topic and travel with it through the pipeline.
@@ -31,7 +103,7 @@ spec/<Area>/<topic>/
 ```
 
 - **CLI:** `unispec change add` / `unispec change list` / `unispec change archive`. All three accept `--area` (defaulting via config to `Staging`); `add` takes `--topic`, `--change`, `--proposal`, `--design` (optional), `--spec-content`, `--task-content`; `list` takes `--topic` and `--archived`; `archive` takes `--topic` and `--change`.
-- **MCP:** Three new tools — `change_add`, `change_list`, `change_archive` — bringing the static tool count to **34**. Required/optional arg shapes match the CLI surface.
+- **MCP:** Three new tools — `change_add`, `change_list`, `change_archive`. Combined with `next`, `analyze`, `constitution_read`, `constitution_check`, and `workspace_status` the static tool count is now **39**. Required/optional arg shapes match the CLI surface.
 - **Shared module:** `src/commands/change.rs` exposes `run_change_add` / `run_change_list` / `run_change_archive`, so CLI and MCP call into the same code (same pattern as `commands/spec.rs` and `commands/queue.rs`).
 - **TUI:** Topics that live under `changes/` now render with a `🔀` prefix; the `changes/` directory itself renders with `📁🔀`. The standard `→` / `←` navigation enters/exits a change folder the same way as any nested topic. Implemented via `TopicNode::is_change` and `TopicNode::is_changes_container` plus a recursion-aware loader.
 - **Docs:** New `docs/change-management.md` (full guide). Updated `cli-reference.md`, `commands.md`, `mcp-tools-reference.md`, `mcp-integration.md`, `architecture.md`, `workflow.md`, `quickstart.md`, `getting-started.md`, `areas.md`, `tui.md`, `troubleshooting.md`, and the `default` mode's `unispec:spec.md`, `unispec_basics.md`, `build.md`, `verify.md`.

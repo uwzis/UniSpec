@@ -78,6 +78,99 @@ Statuses (as reported by `change_list` / `unispec change list`):
 
 The status is derived from the task file every time; there's no separate state column to keep in sync.
 
+## Delta sections — the archive merge
+
+`change_archive` reads the change's `<change>_spec.md` for delta sections and **merges them into the canonical `<topic>_spec.md`** before moving the change to `changes/archive/`. A change spec with no delta sections is archived as a plain move (backward compatible with older changes that just stored a parallel spec).
+
+Four section names are recognised (case-insensitive on the name):
+
+```markdown
+## ADDED Requirements
+### Requirement: <new name>
+<body of the new requirement>
+
+## MODIFIED Requirements
+### Requirement: <existing name>
+<body that REPLACES the existing block — must be the full block, not a diff>
+
+## REMOVED Requirements
+### Requirement: <existing name>
+**Reason:** <why it was removed>
+
+## RENAMED Requirements
+- FROM: ### Requirement: Old Name
+- TO: ### Requirement: New Name
+```
+
+### How the merge runs
+
+Operations apply in this order so name lookups stay stable:
+
+1. **RENAMED** — every `FROM: → TO:` pair renames the matching `### Requirement: Old Name` header in the canonical spec.
+2. **REMOVED** — every named requirement is deleted from the canonical spec.
+3. **MODIFIED** — every block replaces the matching `### Requirement: X` block in place.
+4. **ADDED** — every new block is appended to the end of the canonical spec.
+
+If a MODIFIED / REMOVED / RENAMED FROM name doesn't match anything in the canonical spec, that operation is silently skipped. ADDED names that already exist are skipped to keep the merge idempotent.
+
+The frontmatter on `<topic>_spec.md` is preserved verbatim; only the body is rewritten.
+
+### Worked example
+
+Canonical spec before archive:
+
+```markdown
+---
+title: auth
+...
+---
+
+### Requirement: Login
+Users must be able to login with email and password.
+
+### Requirement: Logout
+Users must be able to logout.
+```
+
+Change spec (`changes/add-2fa/add-2fa_spec.md`):
+
+```markdown
+## ADDED Requirements
+### Requirement: Two Factor Auth
+Users must be able to enable TOTP based two factor authentication.
+
+## MODIFIED Requirements
+### Requirement: Login
+Users must be able to login with email and password. If 2FA is enabled they must also provide a TOTP code.
+```
+
+After `unispec change archive --topic auth --change add-2fa`:
+
+```markdown
+---
+title: auth
+...
+---
+
+### Requirement: Login
+Users must be able to login with email and password. If 2FA is enabled they must also provide a TOTP code.
+
+### Requirement: Logout
+Users must be able to logout.
+
+### Requirement: Two Factor Auth
+Users must be able to enable TOTP based two factor authentication.
+```
+
+And `changes/add-2fa/` is now at `changes/archive/add-2fa/`.
+
+### Authoring tips
+
+- **Each MODIFIED block must contain the ENTIRE replacement body**, not a diff. The merger does header-name matching, not line-by-line patching.
+- **RENAMED runs before REMOVED / MODIFIED / ADDED**, so a `MODIFIED Requirements` block can target the new name set by RENAMED in the same change.
+- **A new requirement that appears in both ADDED and MODIFIED** counts as a hard conflict against the canonical spec — keep one section per requirement name.
+- **`change_archive` does not validate the merged spec.** Run `unispec analyze --topic <t>` after archiving if you want to confirm the merged spec still looks right.
+
 ## Quick recipe
 
 ```bash

@@ -28,8 +28,10 @@ What you get:
 
 ```
 ~/my-app/
+├── AGENTS.md                                ← universal AI-tool entry point
 ├── .agent/
 │   ├── config.toml
+│   ├── constitution.md                      ← project non-negotiables
 │   ├── skill.md
 │   ├── modes/default/{mode.toml, skill.md, templates/, areas/, workflows/, system_prompts/}
 │   ├── modes/README.md
@@ -42,7 +44,7 @@ What you get:
     └── Build/area.md
 ```
 
-All five pipeline areas are present. Default mode is shipped from the binary; no system install required.
+All five pipeline areas are present. Default mode is shipped from the binary; no system install required. `AGENTS.md` is the universal fallback any AI agent honours; `.agent/constitution.md` carries the project's non-negotiable principles.
 
 ## 3. Create a topic
 
@@ -72,6 +74,22 @@ Bad credentials return 401 within 200ms. After 5 failed attempts in 5 minutes, l
 ```
 
 Result: `spec/Staging/user-login/user-login_spec.md` and `user-login_task.md`. The leading-`- ` task lines are tolerated thanks to `allow_hyphen_values` on `--task-content`.
+
+## 4a. Sanity-check the spec with `next` and `analyze`
+
+Two read-only commands give the agent a structured view of where the topic stands.
+
+```bash
+# What should the agent do next?
+unispec next --topic user-login
+
+# Cross-artifact consistency report
+unispec analyze --topic user-login
+```
+
+`next` returns status, open tasks, pending changes, area-specific rules, and a one-sentence `next_action`. `analyze` reports missing task coverage, ambiguous language, empty sections, and task completion. Use them at every stage transition — and any time the agent isn't sure what to do.
+
+Full guides: [next.md](next.md), [analyze.md](analyze.md).
 
 ## 4b. Add a feature to an existing topic (without overwriting the spec)
 
@@ -149,11 +167,13 @@ Add this to `~/.config/Claude/claude_desktop_config.json` (Linux/macOS path; adj
 }
 ```
 
-Restart Claude Code. The 34 built-in tools become available immediately. From inside Claude Code you can now:
+Restart Claude Code. The 39 built-in tools become available immediately. From inside Claude Code you can now:
 
 ```
+> next { "topic": "user-login" }                  ← always start here
 > topics_list { "area": "Staging" }
 > spec_add { "topic": "...", "area": "Staging", "short": "...", "spec_content": "...", "task_content": "..." }
+> analyze { "topic": "user-login" }
 > tasks_complete { "topic": "user-login", "task_index": 0 }
 ```
 

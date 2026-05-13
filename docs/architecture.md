@@ -20,14 +20,18 @@ There are two top-level user-facing surfaces, **CLI** and **MCP**. Both call int
 
 ## Single source of truth for shared logic
 
-Four shared command modules expose pure functions that both the CLI and the MCP server call:
+Eight shared command modules expose pure functions that both the CLI and the MCP server call:
 
 | Module | Public functions | Called by |
 |--------|------------------|-----------|
 | `src/commands/topic.rs` | `run_new`, `run_push`, `run_pull`, `run_show`, `run_list`, `run_delete`, `run_progress`, `auto_checkin`, `auto_checkout` | CLI `topic *`, MCP `topics_*` |
 | `src/commands/spec.rs` | `run_spec_add` | CLI `spec add`, MCP `spec_add` |
 | `src/commands/queue.rs` | `run_queue_add` (returns `QueueAddOutput`) | CLI `queue add`, MCP `queue_add` |
-| `src/commands/change.rs` | `run_change_add`, `run_change_list`, `run_change_archive` | CLI `change *`, MCP `change_*` |
+| `src/commands/change.rs` | `run_change_add`, `run_change_list`, `run_change_archive` (+ delta parser/merger: `parse_delta_spec`, `apply_delta`, `split_into_blocks`) | CLI `change *`, MCP `change_*` |
+| `src/commands/next.rs` | `run_next` (returns `NextOutput` with status, tasks, changes, context_files, rules, next_action, blockers) | CLI `next`, MCP `next` |
+| `src/commands/analyze.rs` | `run_analyze` (six checks: duplication, missing tasks, ambiguous language, empty sections, constitution, completion) | CLI `analyze`, MCP `analyze` |
+| `src/commands/constitution.rs` | `read_constitution`, `check_against_constitution`, `constitution_path` | MCP `constitution_read`, `constitution_check` |
+| `src/commands/workspace.rs` | `run_init`, `run_link`, `run_list`, `run_status` (+ hand-rolled YAML for `.unispec-workspace/workspace.yaml`) | CLI `workspace *`, MCP `workspace_status` |
 
 This means a behaviour change to (e.g.) `run_spec_add` automatically applies to both CLI and MCP — there's no duplication to keep in sync. Earlier branches had inline copies in `server.rs`; PR4 / PR7 refactored them out.
 
@@ -47,7 +51,7 @@ Side effects (platypus mascot triggers, success banners) happen in `main.rs` aft
 2. The server reads a byte stream from stdin, parsing one complete JSON object per request via a hand-rolled brace-counter (handles `\` escapes and string boundaries).
 3. `handle_request` matches `method`:
    - `initialize` → version handshake.
-   - `tools/list` → returns the static tool catalog from `src/mcp/mod.rs::get_tools()` (34 entries).
+   - `tools/list` → returns the static tool catalog from `src/mcp/mod.rs::get_tools()` (39 entries).
    - `tools/call` → routes to `call_tool(name, args)`.
 4. `call_tool` is one large `match name` dispatch. Each arm reads required args, calls into shared `src/commands/<feature>.rs` functions or thin module helpers, and returns a JSON response.
 5. The server writes each response back as a single JSON line to stdout (Zed/Claude Code/MCP standard).
@@ -76,8 +80,12 @@ If neither matches: `Err("Unknown tool: <name>")`. (This was a major source of b
 │   │           │   └── <change>_task.md
 │   │           └── archive/<archived-change>/   # written by `change archive`
 │   └── index.toml                        # topic ↔ path index (written by `index add`)
+├── AGENTS.md                            # universal AI-tool entry point, always written by `unispec init`
+├── .unispec-workspace/                  # only present in a workspace root
+│   └── workspace.yaml                   # `name`, `version: 1`, `links: {name: path}`
 └── .agent/
     ├── config.toml                       # active mode, default area, ingest config, connectors
+    ├── constitution.md                   # project's non-negotiable principles, written by `unispec init`
     ├── skill.md                          # agent persona (copied from active mode)
     ├── workflows/                        # workflow prompts (copied from active mode)
     │   ├── build.md
@@ -133,7 +141,11 @@ All clap structs. The interesting enums:
 | `repo.rs` | `unispec pkg *` (community package repo). |
 | `set.rs` | `unispec set <area>` (sets `default_area` in config). |
 | `spec.rs` | `run_spec_add` shared function. |
-| `change.rs` | `run_change_add` / `run_change_list` / `run_change_archive`. Manages `spec/<area>/<topic>/changes/` — proposing, listing, and archiving per-topic feature additions without touching the original `<topic>_spec.md`. Inspired by OpenSpec's change folders. |
+| `change.rs` | `run_change_add` / `run_change_list` / `run_change_archive`. Manages `spec/<area>/<topic>/changes/` — proposing, listing, and archiving per-topic feature additions. On archive, parses `## ADDED / MODIFIED / REMOVED / RENAMED Requirements` sections and merges them into the canonical spec before the directory move. |
+| `next.rs` | `run_next` → `NextOutput` (status, open/completed tasks across main + changes, pending/archived changes, context_files, area-specific rules, one-sentence next_action, blockers). The agent's single-source-of-truth for "what should I do now?". |
+| `analyze.rs` | `run_analyze` → `AnalyzeOutput` (six static-analysis checks producing ERROR / WARNING / INFO findings). |
+| `constitution.rs` | Read-only access to `.agent/constitution.md` plus a paired-action self-check API for agents. |
+| `workspace.rs` | Hand-rolled YAML reader/writer for `.unispec-workspace/workspace.yaml` (`name`, `version`, `links: {name: path}`), plus `init / link / list / status` operations and the combined-topic-list aggregator. |
 | `topic.rs` | Heart of the CLI: `run_new`, `run_push`, `run_pull`, `run_show`, `run_list`, `run_delete`, `run_progress`, plus the auto-checkout/checkin helpers. |
 
 ### `src/fs/*.rs`
@@ -152,6 +164,7 @@ All clap structs. The interesting enums:
 | `mode.rs` | Mode resolution: which mode is active, what areas it declares, which areas require readiness, what filenames the templates use. |
 | `connector.rs` | Connector configuration + execution (`run_run` spawns the connector's command). |
 | `code_parser.rs` | Tree-sitter parsing for the `code_analysis` / `code_parse` tools. |
+| `integrations/*.rs` | Per-AI-tool format adapters. `mod.rs` defines the `IntegrationAdapter` trait + the always-write `GenericAdapter` (`AGENTS.md`). Adapters: `claude.rs` (`.claude/commands/unispec/<workflow>.md`), `cursor.rs` (`.cursor/rules/unispec-<workflow>.mdc`), `windsurf.rs`, `cline.rs`, `generic.rs`. Selected via `unispec init --<flag>`. |
 | `auto/*.rs` | Legacy auto-build / auto-test / auto-verify orchestration. |
 | `mod.rs` | `load_agent_config`, `current_mode`. |
 

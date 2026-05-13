@@ -185,8 +185,23 @@ unispec topic push <name> --area Build   --from Testing   # if no Fixing pass ne
 
 The whole pipeline can also be driven via MCP — the tools mirror the CLI surface 1:1. See [mcp-tools-reference.md](mcp-tools-reference.md).
 
+## Working the pipeline with an agent
+
+Three commands shape every agent action at every stage:
+
+| Command | When | Purpose |
+|---|---|---|
+| `unispec next --topic <t>` | Before every action | Structured payload — `status`, open tasks, pending changes, area rules, one-sentence `next_action`, any `blockers`. The agent follows `next_action` verbatim and resolves every blocker before proceeding. |
+| `unispec analyze --topic <t>` | After spec edits, before push | Six static checks — duplication, missing task coverage, ambiguous language, empty sections, constitution alignment, task completion. ERROR findings should be fixed before push. |
+| `constitution_read {}` (MCP) | Step 0 of build & verify | Loads `.agent/constitution.md` — non-negotiable principles. Any planned action conflicting with a principle blocks progress. |
+
+`next` and `analyze` both have matching MCP tools with identical payloads. See [next.md](next.md), [analyze.md](analyze.md), [constitution.md](constitution.md).
+
+The default mode's `build.md` and `verify.md` workflows now codify this — Step 0 reads the constitution alongside `next` so every implementation pass starts from the same baseline.
+
 ## See also
 
 - [Areas](areas.md) — per-area conventions (what code belongs in Working vs. Fixing, etc.).
 - [Quickstart](quickstart.md) — five-minute walkthrough with copy-pasteable commands.
 - [Modes](modes.md) — how to customise the pipeline (different areas, different gates).
+- [Next](next.md), [Analyze](analyze.md), [Constitution](constitution.md), [Workspaces](workspaces.md).

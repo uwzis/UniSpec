@@ -109,7 +109,7 @@ Example output:
       - add-oauth [proposed] (proposal, spec, task)
 
 ### change archive
-Move a completed change into `changes/archive/<change>/`. Fails if the change doesn't exist or if a directory with the same name already exists under `archive/`.
+Move a completed change into `changes/archive/<change>/`, **merging any delta sections into the canonical `<topic>_spec.md` first**. Fails if the change doesn't exist or if a directory with the same name already exists under `archive/`.
 
     unispec change archive --topic <name> --change <id> [--area <area>]
 
@@ -117,9 +117,118 @@ Move a completed change into `changes/archive/<change>/`. Fails if the change do
 - `--change, -c` — change name to archive (required)
 - `--area, -a` — area name (defaults to config, then Staging)
 
+**Delta merge.** If the change's `<change>_spec.md` contains any of these sections:
+
+- `## ADDED Requirements` — new `### Requirement: <name>` blocks appended to the canonical spec
+- `## MODIFIED Requirements` — replace matching `### Requirement:` blocks in place
+- `## REMOVED Requirements` — delete matching blocks
+- `## RENAMED Requirements` — `- FROM: ### Requirement: Old` / `- TO: ### Requirement: New`
+
+then the canonical spec is rewritten with those edits applied (in order RENAMED → REMOVED → MODIFIED → ADDED) before the change directory is moved to archive. A change spec with no delta sections is archived without touching the canonical spec.
+
 Example:
 
     unispec change archive --topic auth --change add-2fa
+
+See [change-management.md](change-management.md) for the full delta grammar.
+
+## next
+
+Get a structured next-action payload for a topic — the recommended entry point for any agent driving the pipeline.
+
+    unispec next --topic <name> [--area <area>] [--json]
+
+- `--topic, -t` — topic name (required)
+- `--area, -a` — area name (defaults to config, then Staging)
+- `--json` — emit the full payload as JSON instead of the human summary
+
+The payload contains:
+
+| Field | Meaning |
+|---|---|
+| `status` | `not-started` / `in-progress` / `complete` / `blocked` |
+| `open_tasks`, `completed_tasks` | each task line with `index`, `text`, `from_change` (`None` = main task file, `Some(name)` = inside a change) |
+| `pending_changes`, `archived_changes` | per-change status and which files exist |
+| `context_files` | relative paths the agent should read (topic.md, spec, task, every pending change's proposal/design/spec/task) |
+| `rules` | area-specific constraints (e.g. Staging: "Do not write code yet"; Working: "Spec is frozen"; Build: "Do not modify") |
+| `next_action` | one sentence telling the agent exactly what to do next |
+| `blockers` | reasons the agent cannot proceed (e.g. topic not in queue when leaving Staging) |
+
+Example (human form):
+
+    Topic: auth
+    Area:  Working
+    Status: in-progress
+    Open tasks (2):
+      [ ] Verify TOTP codes (change: add-2fa, idx 0)
+      [ ] Issue recovery codes (change: add-2fa, idx 1)
+    Next action:
+      → Work on task 0 of change 'add-2fa': Verify TOTP codes.
+
+## analyze
+
+Cross-artifact consistency checker. Runs read-only — no files are mutated.
+
+    unispec analyze --topic <name> [--area <area>] [--json]
+
+- `--topic, -t` — topic to analyze (required)
+- `--area, -a` — area name (defaults to config, then Staging)
+- `--json` — emit findings as JSON
+
+Six checks:
+
+1. **Duplication** — a `### Requirement:` name appears in both the canonical spec and a pending change (outside `## MODIFIED Requirements`) → WARNING
+2. **Missing task coverage** — a `### Requirement:` row with no task line referencing it → ERROR
+3. **Ambiguous language** — requirements containing `fast / secure / scalable / easy / simple / good / better / best / quick` without a numeric metric or unit token → WARNING
+4. **Empty sections** — `## <heading>` with no content before the next `##` → WARNING
+5. **Constitution alignment** — surfaces the constitution version as INFO so the agent re-evaluates manually
+6. **Task completion** — `[x] / [ ]` ratio across main + pending change task files → INFO
+
+Example output:
+
+    Analysis for 'auth' in Staging/
+
+    ERROR: Missing task coverage
+      Requirement 'Refresh Token' has no corresponding task.
+
+    WARNING: Ambiguous language
+      Requirement 'Login' contains 'securely' without a measurable metric.
+
+    Summary: 1 error, 1 warning, 2 info
+
+## workspace
+
+Multi-repo coordination across linked UniSpec projects. State lives in `.unispec-workspace/workspace.yaml` in the workspace root.
+
+### workspace init
+Create the workspace file in the current directory.
+
+    unispec workspace init <name>
+
+Writes `.unispec-workspace/workspace.yaml`:
+
+    name: <name>
+    version: 1
+    links: {}
+
+### workspace link
+Add a named pointer to another UniSpec project.
+
+    unispec workspace link <name> <path>
+
+The path is recorded as absolute. Re-running with the same `<name>` updates the path.
+
+### workspace list
+List linked repos and their status (does the path exist; does it have a `spec/` and `.agent/` dir).
+
+    unispec workspace list
+
+### workspace status
+Show every topic across every linked repo.
+
+    unispec workspace status [--json]
+
+Without `--json` prints one row per topic prefixed by area; with `--json` returns a structured payload (matches the `workspace_status` MCP tool).
 
 ## queue
 

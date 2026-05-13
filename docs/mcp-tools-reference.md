@@ -2,7 +2,7 @@
 
 Every MCP tool the UniSpec server publishes via `tools/list`, with required args, optional args, an example JSON-RPC `tools/call` request, and a representative response.
 
-This list is generated against `src/mcp/mod.rs::get_tools()` on the `everything` branch. There are **34 built-in tools** plus one dynamic `unispec_<name>` tool per `[[connector]]` entry in `.agent/config.toml`.
+This list is generated against `src/mcp/mod.rs::get_tools()` on the `feature/change-management` branch. There are **39 built-in tools** plus one dynamic `unispec_<name>` tool per `[[connector]]` entry in `.agent/config.toml`.
 
 > Filename convention: `spec_add` writes `<topic-safe>_spec.md` and `<topic-safe>_task.md`, where `<topic-safe>` is the topic name with `/` and ` ` replaced by `-`. Every read tool (`unispec_read_spec`, `read_asset`, `topics_show`) uses the same names.
 
@@ -270,6 +270,191 @@ Append a dated note (`- **YYYY-MM-DD**: <text>`) to the `## Notes` section. Crea
 } }
 ```
 
+## Next — structured agent feed
+
+### `next`
+
+The recommended first call for any agent working on a topic. Returns a structured payload composing spec/task state, pending changes, queue gating, area conventions, and a one-sentence `next_action`.
+
+**Required:** `topic`. **Optional:** `area` (default `"Staging"`).
+
+**Request:**
+```json
+{ "name": "next", "arguments": { "topic": "auth", "area": "Working" } }
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "topic": "auth",
+  "area": "Working",
+  "status": "in-progress",
+  "open_tasks": [
+    { "index": 2, "text": "Verify TOTP codes", "completed": false, "from_change": "add-2fa" }
+  ],
+  "completed_tasks": [
+    { "index": 0, "text": "Implement POST /login", "completed": true, "from_change": null }
+  ],
+  "pending_changes": [
+    { "name": "add-2fa", "status": "in-progress", "has_proposal": true, "has_design": true, "has_spec": true, "has_task": true }
+  ],
+  "archived_changes": [],
+  "context_files": [
+    "spec/Working/auth/topic.md",
+    "spec/Working/auth/auth_spec.md",
+    "spec/Working/auth/auth_task.md",
+    "spec/Working/auth/changes/add-2fa/proposal.md"
+  ],
+  "rules": [
+    "Implementation phase. Write code under src/ and flip task checkboxes using tasks_complete.",
+    "The spec is frozen — do not modify <topic>_spec.md."
+  ],
+  "next_action": "Work on task 2 of change 'add-2fa': Verify TOTP codes.",
+  "blockers": []
+}
+```
+
+`status` values: `not-started` (spec exists, no tasks done), `in-progress` (some `[x]`, some `[ ]`), `complete` (all `[x]`), `blocked` (`blockers` is non-empty — agent must resolve before proceeding).
+
+`from_change: null` means the task lives in the topic's main `<topic>_task.md`; a non-null value means the task lives in `<change>_task.md` inside that change folder. The `index` is 0-based within its source file.
+
+## Analyze
+
+### `analyze`
+
+Cross-artifact consistency checker. Returns `findings[]` with severity counts.
+
+**Required:** `topic`. **Optional:** `area` (default `"Staging"`).
+
+Six checks (see [cli-reference.md#analyze](cli-reference.md#analyze) for the full description):
+
+| # | Check | Severity |
+|---|-------|----------|
+| 1 | Duplication between canonical spec and pending change | WARNING |
+| 2 | Missing task coverage for `### Requirement:` rows | ERROR |
+| 3 | Ambiguous language without a metric | WARNING |
+| 4 | Empty `## <heading>` sections | WARNING |
+| 5 | Constitution alignment (info only) | INFO |
+| 6 | Overall task completion ratio | INFO |
+
+**Request:**
+```json
+{ "name": "analyze", "arguments": { "topic": "auth", "area": "Staging" } }
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "topic": "auth",
+  "area": "Staging",
+  "findings": [
+    {
+      "severity": "ERROR",
+      "check": "Missing task coverage",
+      "message": "Requirement 'Refresh Token' has no corresponding task.",
+      "detail": "Add a `- [ ]` task to spec/Staging/auth/auth_task.md that mentions 'Refresh Token'."
+    },
+    {
+      "severity": "WARNING",
+      "check": "Ambiguous language",
+      "message": "Requirement 'Login' contains 'securely' without a measurable metric.",
+      "detail": "Replace with a concrete number or threshold (e.g. '< 200ms p95')."
+    }
+  ],
+  "error_count": 1,
+  "warning_count": 1,
+  "info_count": 2
+}
+```
+
+## Constitution
+
+### `constitution_read`
+
+Return the contents of `.agent/constitution.md` — the project's non-negotiable principles.
+
+**Args:** none.
+
+```json
+{ "name": "constitution_read", "arguments": {} }
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "path": "/abs/path/.agent/constitution.md",
+  "content": "# Project Constitution\n\n..."
+}
+```
+
+Errors if the file doesn't exist (run `unispec init` to create it).
+
+### `constitution_check`
+
+Pair the constitution with a proposed action so the agent can self-evaluate whether the action would violate any principle. Intentionally simple: the real semantic evaluation happens in the model, not a regex.
+
+**Required:** `action` (one-sentence description of what the agent is about to do).
+
+```json
+{ "name": "constitution_check", "arguments": {
+    "action": "Push topic to Build without running tests"
+} }
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "action": "Push topic to Build without running tests",
+  "constitution": "# Project Constitution\n\n...",
+  "note": "Read each principle and confirm the proposed action does not violate any. If a principle is violated, do not proceed."
+}
+```
+
+## Workspace
+
+### `workspace_status`
+
+Combined topic list across every repo linked from `.unispec-workspace/workspace.yaml` in the server's current working directory.
+
+**Args:** none.
+
+**Pre-condition:** the MCP server must be launched inside a workspace root (one with `.unispec-workspace/workspace.yaml`). See [workspaces.md](workspaces.md) for setup.
+
+```json
+{ "name": "workspace_status", "arguments": {} }
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "workspace": "my-app",
+  "repos": [
+    {
+      "name": "api",
+      "path": "/abs/path/api",
+      "topics": [
+        { "area": "Staging", "topic": "auth" },
+        { "area": "Working", "topic": "rate-limit" }
+      ],
+      "error": null
+    },
+    {
+      "name": "web",
+      "path": "/abs/path/web",
+      "topics": [{ "area": "Staging", "topic": "login-page" }],
+      "error": null
+    }
+  ]
+}
+```
+
+Per-repo `error` is non-null when the path doesn't exist, or when the path exists but lacks `spec/` (i.e. it's not a UniSpec project).
+
 ## Change management
 
 Three tools manage per-topic change folders (see [change-management.md](change-management.md)). The original `<topic>_spec.md` and `<topic>_task.md` are never touched — these tools only read/write under `spec/<area>/<topic>/changes/`.
@@ -342,7 +527,9 @@ Status values:
 
 ### `change_archive`
 
-Move a change directory from `changes/<change>/` to `changes/archive/<change>/`. Errors if the source change doesn't exist or if `changes/archive/<change>/` already exists.
+Move a change directory from `changes/<change>/` to `changes/archive/<change>/`, **merging any delta sections into the canonical `<topic>_spec.md` first**. Supported sections in the change's `<change>_spec.md`: `## ADDED Requirements`, `## MODIFIED Requirements`, `## REMOVED Requirements`, `## RENAMED Requirements`. Operations are applied in order RENAMED → REMOVED → MODIFIED → ADDED. A change spec with no delta sections is archived without touching the canonical spec.
+
+Errors if the source change doesn't exist or if `changes/archive/<change>/` already exists.
 
 **Required:** `topic`, `change`. **Optional:** `area` (default `"Staging"`).
 

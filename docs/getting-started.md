@@ -52,6 +52,7 @@ This creates:
 
 ```
 my-first-project/
+├── AGENTS.md                       # universal AI-tool entry point
 ├── spec/
 │   ├── Staging/area.md
 │   ├── Working/area.md
@@ -60,12 +61,13 @@ my-first-project/
 │   └── Build/area.md
 └── .agent/
     ├── config.toml
+    ├── constitution.md             # project non-negotiables (5 default principles)
     ├── skill.md
     ├── modes/default/
     └── workflows/
 ```
 
-The areas come from the default mode (`.agent/modes/default/mode.toml`).
+The areas come from the default mode (`.agent/modes/default/mode.toml`). `AGENTS.md` is a universal fallback any AI agent will read; `.agent/constitution.md` carries the project's non-negotiable rules — edit it to reflect your team's actual constraints.
 
 ### 2. Launch the TUI
 
@@ -212,7 +214,12 @@ unispec change add --topic <name> --change <id> \
   --task-content "..."                          # add a feature to an existing topic
 unispec change list --topic <name>             # list pending changes for a topic
 unispec change archive --topic <name> \
-  --change <id>                                 # mark a change complete
+  --change <id>                                 # mark a change complete; merges deltas into the spec
+unispec next --topic <name>                    # structured next-action payload for an agent
+unispec analyze --topic <name>                 # cross-artifact consistency checker
+unispec workspace init <name>                  # create a multi-repo workspace
+unispec workspace link <name> <path>           # link a UniSpec project into the workspace
+unispec workspace status                       # combined topic list across linked repos
 unispec queue add <name>                       # add to the area readiness queue
 unispec topic push <name> --area <target> \
   --from <source>                              # move between areas
@@ -275,6 +282,10 @@ See [indexing.md](indexing.md) for the full feature set.
 
 - [Quickstart](quickstart.md) — same content, five minutes, copy-pasteable
 - [Workflow](workflow.md) — the five-area pipeline rules
+- [Next](next.md) — the structured agent feed (call before every action)
+- [Analyze](analyze.md) — cross-artifact consistency checker
+- [Constitution](constitution.md) — project non-negotiables
+- [Workspaces](workspaces.md) — multi-repo coordination
 - [Change Management](change-management.md) — adding features to existing topics without overwriting the spec
 - [Areas](areas.md) — what each area is for
 - [TUI Guide](tui.md) — every keybinding and screen
