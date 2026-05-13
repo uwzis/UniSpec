@@ -190,6 +190,19 @@ pub enum Commands {
     /// Change management commands (add, list, archive)
     #[command(subcommand)]
     Change(ChangeCommands),
+    /// Get a structured next-action payload for a topic
+    Next {
+        /// Topic name (required)
+        #[arg(short, long)]
+        topic: String,
+        /// Area the topic lives in. Defaults to the `area` field in
+        /// `.agent/config.toml`, or "Staging" if no config exists.
+        #[arg(short, long)]
+        area: Option<String>,
+        /// Emit the full payload as JSON instead of a human summary
+        #[arg(long)]
+        json: bool,
+    },
     /// Agent mode commands
     #[command(subcommand)]
     Mode(ModeCommands),

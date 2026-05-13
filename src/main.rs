@@ -19,7 +19,7 @@ use crate::cli::{
 };
 use crate::cli::{Cli, Commands};
 use crate::commands::{
-    area, change, index, ingest, init, init_editor, queue, repo, set, spec, topic,
+    area, change, index, ingest, init, init_editor, next as next_cmd, queue, repo, set, spec, topic,
 };
 
 fn get_show_platypus() -> bool {
@@ -406,6 +406,103 @@ fn main() -> Result<()> {
                 }
             }
         },
+        Some(Commands::Next { topic, area, json }) => {
+            let area = resolve_area_from_config(area);
+            let out = next_cmd::run_next(&topic, Some(&area))?;
+            if json {
+                let mut value = serde_json::to_value(&out)?;
+                if let serde_json::Value::Object(ref mut map) = value {
+                    map.insert("success".to_string(), serde_json::json!(true));
+                }
+                println!("{}", serde_json::to_string_pretty(&value)?);
+            } else {
+                println!("Topic: {}", out.topic);
+                println!("Area:  {}", out.area);
+                println!("Status: {}", out.status);
+                println!();
+
+                if !out.blockers.is_empty() {
+                    println!("Blockers:");
+                    for b in &out.blockers {
+                        println!("  ! {}", b);
+                    }
+                    println!();
+                }
+
+                println!(
+                    "Open tasks ({}):",
+                    out.open_tasks.len()
+                );
+                if out.open_tasks.is_empty() {
+                    println!("  (none)");
+                } else {
+                    for t in &out.open_tasks {
+                        match &t.from_change {
+                            Some(c) => {
+                                println!("  [ ] {} (change: {}, idx {})", t.text, c, t.index)
+                            }
+                            None => println!("  [ ] {} (idx {})", t.text, t.index),
+                        }
+                    }
+                }
+                println!();
+
+                println!(
+                    "Completed tasks ({}):",
+                    out.completed_tasks.len()
+                );
+                if out.completed_tasks.is_empty() {
+                    println!("  (none)");
+                } else {
+                    for t in &out.completed_tasks {
+                        match &t.from_change {
+                            Some(c) => {
+                                println!("  [x] {} (change: {}, idx {})", t.text, c, t.index)
+                            }
+                            None => println!("  [x] {} (idx {})", t.text, t.index),
+                        }
+                    }
+                }
+                println!();
+
+                if !out.pending_changes.is_empty() {
+                    println!("Pending changes:");
+                    for c in &out.pending_changes {
+                        println!("  - {} [{}]", c.name, c.status);
+                    }
+                    println!();
+                }
+                if !out.archived_changes.is_empty() {
+                    println!("Archived changes:");
+                    for c in &out.archived_changes {
+                        println!("  - {}", c.name);
+                    }
+                    println!();
+                }
+
+                if !out.context_files.is_empty() {
+                    println!("Context files:");
+                    for f in &out.context_files {
+                        println!("  - {}", f);
+                    }
+                    println!();
+                }
+
+                if !out.rules.is_empty() {
+                    println!("Rules:");
+                    for r in &out.rules {
+                        println!("  - {}", r);
+                    }
+                    println!();
+                }
+
+                println!("Next action:");
+                println!("  → {}", out.next_action);
+            }
+            if get_show_platypus() {
+                platypus::happy();
+            }
+        }
         Some(Commands::Change(change_cmd)) => match change_cmd {
             ChangeCommands::Add {
                 topic,

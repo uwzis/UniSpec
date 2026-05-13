@@ -2,6 +2,7 @@
 pub mod area;
 pub mod change;
 pub mod index;
+pub mod next;
 pub mod ingest;
 pub mod init;
 pub mod init_editor;

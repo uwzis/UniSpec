@@ -10,8 +10,13 @@ This prompt defines the contract between you and the MCP server. Tool names are 
 
 Do **not** create or edit `topic.md`, `<topic>_spec.md`, or `<topic>_task.md` with the host editor's Write tool. Use the MCP tools below; they manage filenames, frontmatter (title, short, created, author, status, date), and pipeline state.
 
+## Hard rule: always call `next` first
+
+Before every action on a topic, call `next { topic, area }` and read the full payload. Follow the `next_action` field verbatim. **Do not proceed if `blockers` is non-empty** — resolve every blocker first (typically by calling `queue_add`, `spec_add`, or the tool the blocker text names), then call `next` again. The `rules` field lists area-specific constraints; treat them as binding for the current action.
+
 | Need | Tool | Notes |
 |------|------|-------|
+| **Decide what to do next** | `next { topic, area? }` | **Get structured next-action payload for a topic. Call this before every action to know what to do.** Returns `status`, `open_tasks`, `pending_changes`, `context_files`, `rules`, `next_action`, `blockers`. |
 | Read a template | `read_asset { topic: "templates", asset_type: "topic"|"spec"|"task"|"area" }` | |
 | Read an artifact | `read_asset { topic, asset_type, area? }` or `unispec_read_spec { topic, area? }` | |
 | Create a topic | `topics_add { topic, area, short, content }` | `content` ≥ 10 chars. Don't include `---` — server writes it. |

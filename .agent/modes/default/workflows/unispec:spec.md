@@ -28,6 +28,16 @@ If either is missing, ask the user before doing anything.
 
 ## Steps
 
+### 0. Call `next` first
+
+```
+next { topic: "<topic-name>", area: "Staging" }
+```
+
+Read the full output before doing anything else. If the topic already exists, `next` will tell you whether to layer changes (`change_add`) instead of running this spec workflow. If `blockers` is non-empty, resolve every blocker before proceeding — typically `queue_add` for queue gating, or `spec_add` if there's no spec yet. Treat `rules` as binding for this spec session.
+
+For a brand-new topic where `next` returns `Topic '<name>' does not exist in area 'Staging'`, proceed to step 1 to create it.
+
 ### 1. Read the templates
 ```
 read_asset { topic: "templates", asset_type: "topic" }

@@ -316,6 +316,19 @@ pub fn get_tools() -> Vec<Tool> {
                 "required": ["topic", "new_position"]
             }),
         },
+        // === Next (structured agent feed) ===
+        Tool {
+            name: "next".to_string(),
+            description: "Get a structured next-action payload for a topic. Call this BEFORE every action on a topic — it composes spec/task state, pending changes, queue gating, and area conventions into one decision-grade response with status, open_tasks, pending_changes, context_files, rules, next_action, and blockers. Required: topic. Optional: area (default Staging).".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "topic": { "type": "string", "description": "Topic name" },
+                    "area": { "type": "string", "description": "Area name (default: Staging)" }
+                },
+                "required": ["topic"]
+            }),
+        },
         // === Change Management ===
         Tool {
             name: "change_add".to_string(),

@@ -1143,6 +1143,22 @@ fn call_tool(name: &str, args: &Value) -> Result<Value> {
                 "task_file": out.task_file
             }))
         }
+        // === Next (structured agent feed) ===
+        "next" => {
+            let topic = args
+                .get("topic")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("next requires 'topic'"))?;
+            let area = args.get("area").and_then(|v| v.as_str());
+            let out = crate::commands::next::run_next(topic, area)?;
+            // Serialize the whole struct (it derives Serialize) and attach
+            // success: true. Using to_value avoids re-listing every field.
+            let mut value = serde_json::to_value(&out)?;
+            if let Value::Object(ref mut map) = value {
+                map.insert("success".to_string(), json!(true));
+            }
+            Ok(value)
+        }
         // === Change Management ===
         "change_add" => {
             let topic = args

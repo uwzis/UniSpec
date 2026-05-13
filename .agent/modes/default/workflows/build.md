@@ -37,6 +37,12 @@ If any precondition fails, run `/spec` and `queue_add` first.
 
 ## Steps
 
+0. **Call `next` first.**
+   ```
+   next { topic: "<topic>", area: "Working" }
+   ```
+   Read the full output. Follow `next_action` verbatim. If `blockers` is non-empty, resolve every blocker before proceeding (the blocker text names the tool to call). Treat `rules` as binding for this build pass. Re-call `next` after every meaningful state change (task completed, change archived, push) to get the updated next action.
+
 1. **Orient.**
    ```
    topics_list  { area: "Staging" }
