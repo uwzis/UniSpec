@@ -1143,6 +1143,20 @@ fn call_tool(name: &str, args: &Value) -> Result<Value> {
                 "task_file": out.task_file
             }))
         }
+        // === Analyze ===
+        "analyze" => {
+            let topic = args
+                .get("topic")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("analyze requires 'topic'"))?;
+            let area = args.get("area").and_then(|v| v.as_str());
+            let out = crate::commands::analyze::run_analyze(topic, area)?;
+            let mut value = serde_json::to_value(&out)?;
+            if let Value::Object(ref mut map) = value {
+                map.insert("success".to_string(), json!(true));
+            }
+            Ok(value)
+        }
         // === Constitution ===
         "constitution_read" => {
             let content = crate::commands::constitution::read_constitution()?;

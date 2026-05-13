@@ -190,6 +190,18 @@ pub enum Commands {
     /// Change management commands (add, list, archive)
     #[command(subcommand)]
     Change(ChangeCommands),
+    /// Cross-artifact consistency checker for a topic
+    Analyze {
+        /// Topic name (required)
+        #[arg(short, long)]
+        topic: String,
+        /// Area the topic lives in. Defaults to config, then Staging.
+        #[arg(short, long)]
+        area: Option<String>,
+        /// Emit findings as JSON
+        #[arg(long)]
+        json: bool,
+    },
     /// Get a structured next-action payload for a topic
     Next {
         /// Topic name (required)

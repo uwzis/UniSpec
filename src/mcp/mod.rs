@@ -316,6 +316,19 @@ pub fn get_tools() -> Vec<Tool> {
                 "required": ["topic", "new_position"]
             }),
         },
+        // === Analyze (cross-artifact consistency) ===
+        Tool {
+            name: "analyze".to_string(),
+            description: "Run cross-artifact consistency checks against a topic: duplication, missing task coverage, ambiguous language, empty sections, constitution alignment, task completion. Required: topic. Optional: area (default Staging). Returns findings[] with ERROR / WARNING / INFO severities.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "topic": { "type": "string", "description": "Topic name" },
+                    "area": { "type": "string", "description": "Area name (default: Staging)" }
+                },
+                "required": ["topic"]
+            }),
+        },
         // === Constitution ===
         Tool {
             name: "constitution_read".to_string(),

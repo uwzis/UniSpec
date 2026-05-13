@@ -1,4 +1,5 @@
 // src/commands/mod.rs
+pub mod analyze;
 pub mod area;
 pub mod change;
 pub mod constitution;

@@ -19,7 +19,8 @@ use crate::cli::{
 };
 use crate::cli::{Cli, Commands};
 use crate::commands::{
-    area, change, index, ingest, init, init_editor, next as next_cmd, queue, repo, set, spec, topic,
+    analyze as analyze_cmd, area, change, index, ingest, init, init_editor, next as next_cmd,
+    queue, repo, set, spec, topic,
 };
 
 fn get_show_platypus() -> bool {
@@ -406,6 +407,36 @@ fn main() -> Result<()> {
                 }
             }
         },
+        Some(Commands::Analyze { topic, area, json }) => {
+            let area = resolve_area_from_config(area);
+            let out = analyze_cmd::run_analyze(&topic, Some(&area))?;
+            if json {
+                let mut value = serde_json::to_value(&out)?;
+                if let serde_json::Value::Object(ref mut map) = value {
+                    map.insert("success".to_string(), serde_json::json!(true));
+                }
+                println!("{}", serde_json::to_string_pretty(&value)?);
+            } else {
+                println!("Analysis for '{}' in {}/", out.topic, out.area);
+                println!();
+                for f in &out.findings {
+                    println!("{}: {}", f.severity, f.check);
+                    println!("  {}", f.message);
+                    if let Some(ref d) = f.detail {
+                        println!("  ({})", d);
+                    }
+                    println!();
+                }
+                println!(
+                    "Summary: {} error{}, {} warning{}, {} info",
+                    out.error_count,
+                    if out.error_count == 1 { "" } else { "s" },
+                    out.warning_count,
+                    if out.warning_count == 1 { "" } else { "s" },
+                    out.info_count
+                );
+            }
+        }
         Some(Commands::Next { topic, area, json }) => {
             let area = resolve_area_from_config(area);
             let out = next_cmd::run_next(&topic, Some(&area))?;
