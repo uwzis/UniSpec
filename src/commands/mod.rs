@@ -15,3 +15,4 @@ pub mod repo;
 pub mod set;
 pub mod spec;
 pub mod topic;
+pub mod workspace;

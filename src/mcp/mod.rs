@@ -316,6 +316,15 @@ pub fn get_tools() -> Vec<Tool> {
                 "required": ["topic", "new_position"]
             }),
         },
+        // === Workspace (multi-repo coordination) ===
+        Tool {
+            name: "workspace_status".to_string(),
+            description: "Return the combined topic list across every repo linked from `.unispec-workspace/workspace.yaml` in the server's current working directory. Requires the server to be launched inside a workspace root.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
         // === Analyze (cross-artifact consistency) ===
         Tool {
             name: "analyze".to_string(),

@@ -190,6 +190,9 @@ pub enum Commands {
     /// Change management commands (add, list, archive)
     #[command(subcommand)]
     Change(ChangeCommands),
+    /// Multi-repo workspace coordination (init, link, list, status)
+    #[command(subcommand)]
+    Workspace(WorkspaceCommands),
     /// Cross-artifact consistency checker for a topic
     Analyze {
         /// Topic name (required)
@@ -447,6 +450,30 @@ pub enum QueueCommands {
         /// to the end (default).
         #[arg(short, long, default_value_t = -1)]
         position: i32,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum WorkspaceCommands {
+    /// Initialize a workspace in the current directory
+    Init {
+        /// Workspace name
+        name: String,
+    },
+    /// Link a UniSpec project into this workspace under `<name>`
+    Link {
+        /// Short name to reference this repo by
+        name: String,
+        /// Path to the UniSpec project root
+        path: String,
+    },
+    /// List linked repos in this workspace
+    List,
+    /// Combined view of every topic across every linked repo
+    Status {
+        /// Emit as JSON
+        #[arg(long)]
+        json: bool,
     },
 }
 

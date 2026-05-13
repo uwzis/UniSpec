@@ -1143,6 +1143,16 @@ fn call_tool(name: &str, args: &Value) -> Result<Value> {
                 "task_file": out.task_file
             }))
         }
+        // === Workspace ===
+        "workspace_status" => {
+            let (name, repos) =
+                crate::commands::workspace::run_status(std::path::Path::new("."))?;
+            Ok(json!({
+                "success": true,
+                "workspace": name,
+                "repos": repos
+            }))
+        }
         // === Analyze ===
         "analyze" => {
             let topic = args

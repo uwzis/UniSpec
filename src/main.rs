@@ -15,12 +15,12 @@ use crate::agent::{connector as agent_connector, mode as agent_mode};
 use crate::cli::{
     AreaCommands, AreaOrderCommands, AutoCommands, ChangeCommands, ConnectorCommands,
     IndexCommands, IngestCommands, ModeCommands, OrderCommands, ParseCommands, PattyCommands,
-    PkgCommands, QueueCommands, SpecCommands, TopicCommands,
+    PkgCommands, QueueCommands, SpecCommands, TopicCommands, WorkspaceCommands,
 };
 use crate::cli::{Cli, Commands};
 use crate::commands::{
     analyze as analyze_cmd, area, change, index, ingest, init, init_editor, next as next_cmd,
-    queue, repo, set, spec, topic,
+    queue, repo, set, spec, topic, workspace as workspace_cmd,
 };
 
 fn get_show_platypus() -> bool {
@@ -437,6 +437,67 @@ fn main() -> Result<()> {
                 );
                 if get_show_platypus() {
                     platypus::happy();
+                }
+            }
+        },
+        Some(Commands::Workspace(ws_cmd)) => match ws_cmd {
+            WorkspaceCommands::Init { name } => {
+                let path = workspace_cmd::run_init(std::path::Path::new("."), &name)?;
+                println!("✅ Workspace '{}' initialized at {}", name, path.display());
+            }
+            WorkspaceCommands::Link { name, path } => {
+                let ws = workspace_cmd::run_link(std::path::Path::new("."), &name, &path)?;
+                println!(
+                    "✅ Linked '{}' to {} in workspace '{}'",
+                    name,
+                    ws.links.get(&name).cloned().unwrap_or_else(|| path.clone()),
+                    ws.name
+                );
+            }
+            WorkspaceCommands::List => {
+                let (ws_name, links) = workspace_cmd::run_list(std::path::Path::new("."))?;
+                println!("Workspace: {}", ws_name);
+                if links.is_empty() {
+                    println!("  (no linked repos — use `unispec workspace link <name> <path>`)");
+                } else {
+                    for l in &links {
+                        let path_status = if l.path_exists { "✓" } else { "✗ path missing" };
+                        let unispec_status = if l.has_unispec {
+                            "✓ unispec"
+                        } else if l.path_exists {
+                            "✗ no spec/.agent"
+                        } else {
+                            ""
+                        };
+                        println!("  - {:<12} {} [{} {}]", l.name, l.path, path_status, unispec_status);
+                    }
+                }
+            }
+            WorkspaceCommands::Status { json } => {
+                let (ws_name, repos) = workspace_cmd::run_status(std::path::Path::new("."))?;
+                if json {
+                    let value = serde_json::json!({
+                        "success": true,
+                        "workspace": ws_name,
+                        "repos": repos,
+                    });
+                    println!("{}", serde_json::to_string_pretty(&value)?);
+                } else {
+                    println!("Workspace: {}", ws_name);
+                    for r in &repos {
+                        println!("\n[{}] {}", r.name, r.path);
+                        if let Some(ref e) = r.error {
+                            println!("  ! {}", e);
+                            continue;
+                        }
+                        if r.topics.is_empty() {
+                            println!("  (no topics)");
+                        } else {
+                            for t in &r.topics {
+                                println!("  {}/{}", t.area, t.topic);
+                            }
+                        }
+                    }
                 }
             }
         },
