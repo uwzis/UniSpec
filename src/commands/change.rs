@@ -325,6 +325,25 @@ pub fn run_change_archive(
         ));
     }
 
+    // Delta merge: if the change spec contains delta sections (ADDED /
+    // MODIFIED / REMOVED / RENAMED Requirements), apply them to the topic's
+    // canonical <topic>_spec.md before moving the change to archive. If no
+    // delta sections are present, skip the merge (backward compatible with
+    // older changes that just stored a parallel spec).
+    let change_spec_path = from.join(format!("{}_spec.md", change_safe));
+    if change_spec_path.exists() {
+        let topic_safe = topic.replace('/', "-").replace(' ', "-");
+        let canonical_path = topic_dir.join(format!("{}_spec.md", topic_safe));
+        if canonical_path.exists() {
+            let change_spec = std::fs::read_to_string(&change_spec_path)?;
+            if let Some(delta) = parse_delta_spec(&change_spec) {
+                let canonical = std::fs::read_to_string(&canonical_path)?;
+                let merged = apply_delta(&canonical, &delta);
+                std::fs::write(&canonical_path, merged)?;
+            }
+        }
+    }
+
     std::fs::rename(&from, &to)?;
 
     Ok(ChangeArchiveOutput {
@@ -334,4 +353,335 @@ pub fn run_change_archive(
         from,
         to,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Delta parser / merger
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Default)]
+struct DeltaSpec {
+    added: Vec<RequirementBlock>,
+    modified: Vec<RequirementBlock>,
+    /// Names of requirements to delete from the canonical spec.
+    removed: Vec<String>,
+    /// (old_name, new_name) pairs to rename in place.
+    renamed: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone)]
+struct RequirementBlock {
+    name: String,
+    /// Full block text starting with `### Requirement: <name>` line.
+    body: String,
+}
+
+/// Returns `None` if the change spec contains no delta sections — caller
+/// treats that as "skip merge".
+fn parse_delta_spec(content: &str) -> Option<DeltaSpec> {
+    // Skip frontmatter if present so `## ADDED Requirements` etc. don't get
+    // confused with anything inside the YAML block.
+    let body = strip_frontmatter(content);
+
+    // Identify the four section names case-insensitively. If none are
+    // present, this isn't a delta spec.
+    let lines: Vec<&str> = body.lines().collect();
+    let section_idxs: Vec<(usize, &str)> = lines
+        .iter()
+        .enumerate()
+        .filter_map(|(i, l)| {
+            let t = l.trim();
+            // Match `## <NAME> Requirements` (case-insensitive on the name).
+            if let Some(rest) = t.strip_prefix("## ") {
+                let rest_lower = rest.to_lowercase();
+                for tag in ["added", "modified", "removed", "renamed"] {
+                    let prefix = format!("{} requirements", tag);
+                    if rest_lower == prefix
+                        || rest_lower.starts_with(&format!("{} ", prefix))
+                    {
+                        return Some((i, tag));
+                    }
+                }
+            }
+            None
+        })
+        .collect();
+
+    if section_idxs.is_empty() {
+        return None;
+    }
+
+    let mut delta = DeltaSpec::default();
+
+    for (k, (start_idx, tag)) in section_idxs.iter().enumerate() {
+        let end_idx = if k + 1 < section_idxs.len() {
+            section_idxs[k + 1].0
+        } else {
+            lines.len()
+        };
+        // Section content is between [start_idx+1, end_idx).
+        let section_lines = &lines[start_idx + 1..end_idx];
+
+        match *tag {
+            "added" | "modified" => {
+                let blocks = parse_requirement_blocks(section_lines);
+                if *tag == "added" {
+                    delta.added.extend(blocks);
+                } else {
+                    delta.modified.extend(blocks);
+                }
+            }
+            "removed" => {
+                // Each `### Requirement: <name>` line names a deletion.
+                for l in section_lines {
+                    let t = l.trim();
+                    if let Some(name) = t.strip_prefix("### Requirement:") {
+                        delta.removed.push(name.trim().to_string());
+                    } else if let Some(rest) = t.strip_prefix("- ") {
+                        // Allow bullet-style `- ### Requirement: X` as well.
+                        if let Some(name) = rest.trim().strip_prefix("### Requirement:") {
+                            delta.removed.push(name.trim().to_string());
+                        }
+                    }
+                }
+            }
+            "renamed" => {
+                // Expect alternating `- FROM:` / `- TO:` lines (in any order).
+                let mut current_from: Option<String> = None;
+                for l in section_lines {
+                    let t = l.trim().trim_start_matches('-').trim();
+                    if let Some(rest) = t.strip_prefix("FROM:") {
+                        if let Some(name) = rest.trim().strip_prefix("### Requirement:") {
+                            current_from = Some(name.trim().to_string());
+                        }
+                    } else if let Some(rest) = t.strip_prefix("TO:") {
+                        if let Some(name) = rest.trim().strip_prefix("### Requirement:") {
+                            if let Some(from_name) = current_from.take() {
+                                delta.renamed.push((from_name, name.trim().to_string()));
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Some(delta)
+}
+
+/// Split a chunk of section content into `### Requirement: <name>` blocks.
+/// Each block runs from its header line until the next `### Requirement:`
+/// header or the next `## ` top-level section.
+fn parse_requirement_blocks(section_lines: &[&str]) -> Vec<RequirementBlock> {
+    let mut out = vec![];
+    let mut current: Option<RequirementBlock> = None;
+    for l in section_lines {
+        let t = l.trim_start();
+        if let Some(name_part) = t.strip_prefix("### Requirement:") {
+            if let Some(b) = current.take() {
+                out.push(b);
+            }
+            current = Some(RequirementBlock {
+                name: name_part.trim().to_string(),
+                body: format!("{}\n", l),
+            });
+        } else if t.starts_with("## ") {
+            // Another top-level section started — flush.
+            if let Some(b) = current.take() {
+                out.push(b);
+            }
+            break;
+        } else if let Some(ref mut b) = current {
+            b.body.push_str(l);
+            b.body.push('\n');
+        }
+    }
+    if let Some(b) = current {
+        out.push(b);
+    }
+    // Trim trailing whitespace from each block body so reassembled specs
+    // don't accumulate blank lines.
+    for b in &mut out {
+        while b.body.ends_with("\n\n") {
+            b.body.pop();
+        }
+    }
+    out
+}
+
+fn strip_frontmatter(content: &str) -> &str {
+    if content.trim_start().starts_with("---") {
+        if let Some(end) = content.find("\n---") {
+            return &content[end + 5..];
+        }
+    }
+    content
+}
+
+/// Returns the canonical spec with the delta applied. Operations are run in
+/// the order RENAMED → REMOVED → MODIFIED → ADDED so name lookups remain
+/// stable: renames land first, then deletions, then in-place edits, then
+/// appends.
+fn apply_delta(canonical: &str, delta: &DeltaSpec) -> String {
+    // Split canonical into (frontmatter_prefix, body). We keep frontmatter
+    // verbatim and only mutate the body.
+    let (prefix, body) = split_frontmatter(canonical);
+
+    let mut blocks = split_into_blocks(body);
+
+    // RENAMED — change the name in the header line and the block's `name`.
+    for (from, to) in &delta.renamed {
+        if let Some(idx) = blocks.iter().position(|b| matches!(b, Block::Req(r) if &r.name == from)) {
+            if let Block::Req(ref mut r) = blocks[idx] {
+                let old_hdr = format!("### Requirement: {}", from);
+                let new_hdr = format!("### Requirement: {}", to);
+                r.body = r.body.replacen(&old_hdr, &new_hdr, 1);
+                r.name = to.clone();
+            }
+        }
+    }
+
+    // REMOVED — drop matching blocks.
+    blocks.retain(|b| match b {
+        Block::Req(r) => !delta.removed.iter().any(|n| n == &r.name),
+        _ => true,
+    });
+
+    // MODIFIED — replace matching blocks' body.
+    for new_block in &delta.modified {
+        if let Some(idx) = blocks
+            .iter()
+            .position(|b| matches!(b, Block::Req(r) if r.name == new_block.name))
+        {
+            if let Block::Req(ref mut r) = blocks[idx] {
+                r.body = ensure_trailing_newline(&new_block.body);
+            }
+        }
+    }
+
+    // ADDED — append at the end (preceded by a blank line for readability).
+    let has_existing_reqs = blocks.iter().any(|b| matches!(b, Block::Req(_)));
+    for new_block in &delta.added {
+        // Skip duplicates by name to keep merges idempotent.
+        if blocks
+            .iter()
+            .any(|b| matches!(b, Block::Req(r) if r.name == new_block.name))
+        {
+            continue;
+        }
+        if has_existing_reqs || !blocks.is_empty() {
+            blocks.push(Block::Text("\n".to_string()));
+        }
+        blocks.push(Block::Req(RequirementBlock {
+            name: new_block.name.clone(),
+            body: ensure_trailing_newline(&new_block.body),
+        }));
+    }
+
+    let mut out = String::from(prefix);
+    for b in &blocks {
+        match b {
+            Block::Text(s) => out.push_str(s),
+            Block::Req(r) => out.push_str(&r.body),
+        }
+    }
+
+    out
+}
+
+fn ensure_trailing_newline(s: &str) -> String {
+    if s.ends_with('\n') {
+        s.to_string()
+    } else {
+        format!("{}\n", s)
+    }
+}
+
+fn split_frontmatter(content: &str) -> (String, &str) {
+    if content.trim_start().starts_with("---") {
+        if let Some(end) = content.find("\n---") {
+            // Include the trailing `---` and the newline after it in the prefix.
+            let prefix_end = end + 5; // past `\n---\n` (4) or `\n---` + EOF
+            let prefix_end = prefix_end.min(content.len());
+            let prefix = content[..prefix_end].to_string();
+            let body = &content[prefix_end..];
+            return (prefix, body);
+        }
+    }
+    (String::new(), content)
+}
+
+enum Block {
+    Text(String),
+    Req(RequirementBlock),
+}
+
+/// Tokenize a spec body into a stream of `Text` chunks and `Requirement`
+/// blocks. A requirement block starts with `### Requirement: <name>` and ends
+/// at the next `### Requirement:` header, the next `## ` top-level section,
+/// or EOF.
+fn split_into_blocks(body: &str) -> Vec<Block> {
+    let mut blocks: Vec<Block> = vec![];
+    let mut text_buf = String::new();
+    let mut req: Option<RequirementBlock> = None;
+
+    for line in body.lines() {
+        let trimmed = line.trim_start();
+        let is_req_header = trimmed.starts_with("### Requirement:");
+        let is_top_section = trimmed.starts_with("## ");
+
+        if is_req_header {
+            if !text_buf.is_empty() {
+                blocks.push(Block::Text(std::mem::take(&mut text_buf)));
+            }
+            if let Some(b) = req.take() {
+                blocks.push(Block::Req(b));
+            }
+            let name = trimmed
+                .strip_prefix("### Requirement:")
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            req = Some(RequirementBlock {
+                name,
+                body: format!("{}\n", line),
+            });
+        } else if is_top_section && req.is_some() {
+            blocks.push(Block::Req(req.take().unwrap()));
+            text_buf.push_str(line);
+            text_buf.push('\n');
+        } else if let Some(ref mut r) = req {
+            r.body.push_str(line);
+            r.body.push('\n');
+        } else {
+            text_buf.push_str(line);
+            text_buf.push('\n');
+        }
+    }
+    if !text_buf.is_empty() {
+        blocks.push(Block::Text(text_buf));
+    }
+    if let Some(b) = req {
+        blocks.push(Block::Req(b));
+    }
+    // Preserve trailing newline behaviour: if the original body ended without
+    // a newline, the last block will already reflect that.
+    if !body.ends_with('\n') {
+        if let Some(last) = blocks.last_mut() {
+            match last {
+                Block::Text(s) => {
+                    if s.ends_with('\n') {
+                        s.pop();
+                    }
+                }
+                Block::Req(r) => {
+                    if r.body.ends_with('\n') {
+                        r.body.pop();
+                    }
+                }
+            }
+        }
+    }
+    blocks
 }
