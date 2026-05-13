@@ -6,6 +6,40 @@ The current line of work lives on the `everything` branch. PR0 through PR7 are t
 
 ---
 
+## [Unreleased] — `feature/change-management`
+
+### Added
+
+#### Change management (OpenSpec-inspired)
+
+A new way to propose features for an existing topic without overwriting its original spec. Changes live in a child folder under the topic and travel with it through the pipeline.
+
+On-disk layout:
+
+```
+spec/<Area>/<topic>/
+├── topic.md
+├── <topic>_spec.md         ← original, never modified
+├── <topic>_task.md
+└── changes/
+    ├── <change>/
+    │   ├── proposal.md
+    │   ├── design.md           # optional
+    │   ├── <change>_spec.md
+    │   └── <change>_task.md
+    └── archive/<archived-change>/
+```
+
+- **CLI:** `unispec change add` / `unispec change list` / `unispec change archive`. All three accept `--area` (defaulting via config to `Staging`); `add` takes `--topic`, `--change`, `--proposal`, `--design` (optional), `--spec-content`, `--task-content`; `list` takes `--topic` and `--archived`; `archive` takes `--topic` and `--change`.
+- **MCP:** Three new tools — `change_add`, `change_list`, `change_archive` — bringing the static tool count to **34**. Required/optional arg shapes match the CLI surface.
+- **Shared module:** `src/commands/change.rs` exposes `run_change_add` / `run_change_list` / `run_change_archive`, so CLI and MCP call into the same code (same pattern as `commands/spec.rs` and `commands/queue.rs`).
+- **TUI:** Topics that live under `changes/` now render with a `🔀` prefix; the `changes/` directory itself renders with `📁🔀`. The standard `→` / `←` navigation enters/exits a change folder the same way as any nested topic. Implemented via `TopicNode::is_change` and `TopicNode::is_changes_container` plus a recursion-aware loader.
+- **Docs:** New `docs/change-management.md` (full guide). Updated `cli-reference.md`, `commands.md`, `mcp-tools-reference.md`, `mcp-integration.md`, `architecture.md`, `workflow.md`, `quickstart.md`, `getting-started.md`, `areas.md`, `tui.md`, `troubleshooting.md`, and the `default` mode's `unispec:spec.md`, `unispec_basics.md`, `build.md`, `verify.md`.
+
+The original `<topic>_spec.md` is never read or written by any of the new code paths — it remains the source of truth. `spec_add` itself doesn't enforce "first call only" (it will silently overwrite if rerun), so the convention is operational: use `spec_add` exactly once per topic, then reach for `change_add` for every subsequent feature.
+
+---
+
 ## [0.0.8] — current `everything` branch
 
 This release consolidates seven topic branches that closed end-to-end usability and correctness gaps in the CLI, init, MCP server, and TUI. After this, an AI agent or human can drive a topic from creation through the five-area pipeline to Build using either the CLI or MCP, without hitting silent failures.

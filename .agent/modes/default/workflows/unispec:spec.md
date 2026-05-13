@@ -19,7 +19,8 @@ If either is missing, ask the user before doing anything.
 |------|---------------|-------|
 | `read_asset` | `topic, asset_type` | Read templates with `topic: "templates"`, `asset_type ∈ {"topic","spec","task"}`. |
 | `topics_add` | `topic, area, short, content` | `content` ≥ 10 chars. Server prepends frontmatter — don't include `---`. |
-| `spec_add` | `topic, area, short, spec_content, task_content` | Both content fields ≥ 10 chars. Creates `<topic>_spec.md` and `<topic>_task.md`. |
+| `spec_add` | `topic, area, short, spec_content, task_content` | **First spec for a topic only (by convention).** Both content fields ≥ 10 chars. Creates `<topic>_spec.md` and `<topic>_task.md`. Will silently overwrite if rerun — never use it to "add a feature" to an existing topic. |
+| `change_add` | `topic, change, proposal, spec_content, task_content` | **Adding features to an existing topic.** Use this whenever `<topic>_spec.md` already exists. Writes under `spec/<area>/<topic>/changes/<change>/` and refuses to overwrite an existing change folder. |
 | `queue_add` | `topic, area` | Add to `spec/Staging/queue.md`. |
 | `topics_show` | `topic, area` | Verify the files exist. |
 
@@ -96,6 +97,46 @@ queue_check { topic: "<topic-name>", area: "Staging" }
 - `queue_check { topic, area: "Staging" }` returns `ready: true`.
 
 ---
+
+## Adding a feature to an existing topic
+
+`spec_add` refuses to overwrite an existing spec — by design, the topic's foundational requirements are evidence of what shipped. Layer new features on top with `change_add`:
+
+```
+change_add {
+  topic: "<existing-topic>",
+  area: "<area>",
+  change: "<change-id>",            // kebab-case, e.g. "add-2fa"
+  proposal: "<why this change exists, ≥ 11 chars>",
+  design: "<optional technical approach>",
+  spec_content: "<new requirements only, ≥ 11 chars>",
+  task_content: "<new tasks only, ≥ 11 chars>"
+}
+```
+
+This writes:
+
+```
+spec/<Area>/<topic>/
+├── topic.md
+├── <topic>_spec.md            ← untouched
+├── <topic>_task.md            ← untouched
+└── changes/
+    └── <change>/
+        ├── proposal.md
+        ├── design.md          (only if `design` supplied)
+        ├── <change>_spec.md
+        └── <change>_task.md
+```
+
+After implementing the change, archive it:
+
+```
+change_list    { topic, area }                     // verify it's complete
+change_archive { topic, area, change }             // moves to changes/archive/<change>/
+```
+
+See [docs/change-management.md](../../../docs/change-management.md) for the full guide.
 
 ## Failure modes
 

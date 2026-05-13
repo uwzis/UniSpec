@@ -191,6 +191,46 @@ Ordered list of topics to work on:
 
 The four queue MCP tools (`queue_list`, `queue_add`, `queue_remove`, `queue_check`, `queue_reorder`) and the CLI `queue add` subcommand all read/write this same file. There is no separate index.
 
+## Changes live inside topics, in every area
+
+A topic can carry its own `changes/` subtree — proposed feature additions written via `change_add` without touching the original `<topic>_spec.md`. The directory layout is:
+
+```
+spec/<Area>/<topic>/
+├── topic.md
+├── <topic>_spec.md
+├── <topic>_task.md
+└── changes/
+    ├── <change>/
+    │   ├── proposal.md
+    │   ├── design.md          # optional
+    │   ├── <change>_spec.md
+    │   └── <change>_task.md
+    └── archive/<archived-change>/
+```
+
+`changes/` is always inside the topic, never at the area root. There is no `spec/<Area>/changes/`. Each area can host changes attached to any of its topics.
+
+### How changes move through the pipeline
+
+`topics_push` copies the *entire* topic directory — including `changes/` and `changes/archive/` — to the target area, then removes the source. So:
+
+- A change proposed in **Staging** rides into **Working** when the topic is pushed there. Agents in Working can read its `<change>_spec.md` and tick off `<change>_task.md`.
+- A change implemented in **Working** travels through **Testing** and **Fixing** untouched. The work belongs to the topic, not to any one area.
+- An archived change (`changes/archive/<name>/`) follows the same path. It stays diffable in `git` but is filtered out of `change_list` (unless `include_archived: true`).
+
+There is no separate "push the change" command. Changes are part of the topic; they move when the topic moves.
+
+### When to spawn a change vs. push the topic back
+
+| Situation | Right answer |
+|-----------|--------------|
+| Topic is in Working, you want to add a new feature that isn't in the spec yet | `change_add` while the topic is in Working — write the proposal, design, spec, task. Implement during the same Working pass. |
+| Topic is in Build (shipped), you want to add a feature | `topic pull` to bring it back; then `change_add` in the current default area, then push it forward again. |
+| Spec turned out to be wrong (not "missing a feature" — actually wrong) | `topic pull` to Staging; either re-`spec_add` (acknowledging you're discarding the original) or fix manually. Changes are for *additions*, not retractions. |
+
+See [change-management.md](change-management.md) for the full guide.
+
 ## Custom areas
 
 You can declare additional areas in a custom mode. For example, a 7-area "RFC" mode might be:

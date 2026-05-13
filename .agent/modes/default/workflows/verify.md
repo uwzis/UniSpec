@@ -11,6 +11,8 @@ Mirrors `.agent/workflows/verify.md`; per-mode copy.
 MCP:
 - `unispec_read_spec { topic, area }`
 - `read_asset { topic, asset_type: "spec", area }`
+- `change_list { topic, area, include_archived? }` — every non-archived change must be accounted for before push to Build
+- `change_archive { topic, change, area }` — archive a complete change so it stops showing as live work
 - `index_list { topic }`
 - `index_find { query, by }` — `by ∈ {"topic","path","tag"}`
 - `index_backlinks { topic }`
@@ -31,7 +33,22 @@ There is no MCP tool named `unispec_auto_verify`, `unispec_query_relations`, `un
    ```
    unispec_read_spec { topic: "<topic>", area: "<Testing or Working>" }
    index_list        { topic: "<topic>" }
+   change_list       { topic: "<topic>", area: "<Testing or Working>" }
    ```
+
+   **Account for every pending change before pushing to Build.** A topic
+   that still has unarchived changes is *not* ready to ship — verify each
+   one the same way you verify the topic's own requirements:
+
+   - For every non-archived change, read its
+     `spec/<area>/<topic>/changes/<change>/<change>_spec.md` and trace its
+     requirements the same way as the topic's `REQ-*` rows below.
+   - If a change is fully implemented (every box `[x]` in its task file
+     AND all its requirements have evidence), `change_archive` it so it
+     stops showing as live work.
+   - If a change is genuinely deferred (won't ship in this build),
+     `notes_add` an explanation. Do not silently leave it unarchived —
+     downstream verifiers will treat it as a blocker.
 
 2. **Trace each requirement.** For every `REQ-*` in the spec:
    - Find the linked file(s) from `index_list` (filter `link_type: "implementation"`).
@@ -80,6 +97,7 @@ There is no MCP tool named `unispec_auto_verify`, `unispec_query_relations`, `un
 ## Definition of done
 
 - Every `REQ-*` in the spec has a recorded state (`✓` / `⚠` / `✗`) with `<file>:<line>` evidence.
+- Every non-archived change reported by `change_list` is either fully verified and `change_archive`-d, or explicitly deferred via `notes_add`. No pending changes are left silently unaccounted for.
 - The verification block is appended via `notes_add`.
 - With `--fix`: gaps closed, topic back in `Testing`, `task_status` is `complete`.
 - Without `--fix`: gaps reported by `REQ-*` ID; the topic stays where it is.

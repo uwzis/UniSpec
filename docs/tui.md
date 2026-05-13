@@ -67,6 +67,29 @@ The status badge:
 
 In the TopicList view, `q` adds the highlighted topic to that area's `queue.md`. To quit the TUI from here, press `←` first to back out to area selection, then `q`.
 
+### Changes (when a topic has a `changes/` subtree)
+
+If a topic has any changes (proposed via `unispec change add` or the MCP `change_add` tool), they appear in the same list as nested topics, with distinctive prefixes:
+
+```
+┌─ Topics in Staging ───────────────┐
+│ → auth                            │
+│     ✅ auth     (spec)            │
+│     📁🔀 changes                  │
+│       🔀 add-2fa                  │
+│         🔀 add-2fa  (spec, 1/3)   │
+│       🔀 add-oauth                │
+│         🔀 add-oauth (spec)       │
+└───────────────────────────────────┘
+```
+
+| Prefix | What it marks |
+|--------|----------------|
+| `📁🔀` | The `changes/` directory itself — the container holding every change for this topic. |
+| `🔀` | A change folder (e.g. `add-2fa`), or a spec/task entry living inside a change folder. |
+
+Navigation is identical to nested topics — press `→` to enter the `changes/` container, `→` again to enter a specific change folder, and `Enter` on any markdown file to open it in `$EDITOR`. The archive (`changes/archive/`) shows up the same way; archived changes still render with the `🔀` prefix so you can tell they're change-related.
+
 ### 3. Nested specs
 
 When a topic has child topics (e.g. `auth/` containing `auth/login` and `auth/logout`), `→` from the parent drills into the nested view. Same key layout as the topic list.

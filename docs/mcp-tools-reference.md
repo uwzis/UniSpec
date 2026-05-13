@@ -2,7 +2,7 @@
 
 Every MCP tool the UniSpec server publishes via `tools/list`, with required args, optional args, an example JSON-RPC `tools/call` request, and a representative response.
 
-This list is generated against `src/mcp/mod.rs::get_tools()` on the `everything` branch. There are **31 built-in tools** plus one dynamic `unispec_<name>` tool per `[[connector]]` entry in `.agent/config.toml`.
+This list is generated against `src/mcp/mod.rs::get_tools()` on the `everything` branch. There are **34 built-in tools** plus one dynamic `unispec_<name>` tool per `[[connector]]` entry in `.agent/config.toml`.
 
 > Filename convention: `spec_add` writes `<topic-safe>_spec.md` and `<topic-safe>_task.md`, where `<topic-safe>` is the topic name with `/` and ` ` replaced by `-`. Every read tool (`unispec_read_spec`, `read_asset`, `topics_show`) uses the same names.
 
@@ -268,6 +268,98 @@ Append a dated note (`- **YYYY-MM-DD**: <text>`) to the `## Notes` section. Crea
 { "name": "notes_add", "arguments": {
     "topic": "user-login", "note": "Chose argon2id over bcrypt — see issue #42"
 } }
+```
+
+## Change management
+
+Three tools manage per-topic change folders (see [change-management.md](change-management.md)). The original `<topic>_spec.md` and `<topic>_task.md` are never touched — these tools only read/write under `spec/<area>/<topic>/changes/`.
+
+### `change_add`
+
+Create a new change folder inside an existing topic. Writes `proposal.md`, optional `design.md`, `<change>_spec.md`, and `<change>_task.md` under `spec/<area>/<topic>/changes/<change>/`.
+
+**Required:** `topic`, `change`, `proposal`, `spec_content`, `task_content`. **Optional:** `area` (default `"Staging"`), `design`.
+
+**Constraints.** `proposal`, `spec_content`, and `task_content` are trimmed and must each be > 10 chars. `change` is normalised by replacing `/` and ` ` with `-`. The topic directory must already exist (case-insensitive area match). Errors if `spec/<area>/<topic>/changes/<change>/` already exists.
+
+**Request:**
+```json
+{ "name": "change_add", "arguments": {
+    "topic": "auth", "area": "Staging", "change": "add-2fa",
+    "proposal": "Protect high-value accounts with a second factor.",
+    "design": "TOTP via authenticator apps; encrypted seed at rest.",
+    "spec_content": "## 2FA requirements\n- TOTP enrolment\n- 8 recovery codes",
+    "task_content": "- [ ] Generate TOTP seeds\n- [ ] Verify codes on login"
+} }
+```
+
+**Response:**
+```json
+{ "success": true,
+  "message": "Change folder created",
+  "topic": "auth",
+  "area": "Staging",
+  "change": "add-2fa",
+  "change_dir": "/abs/path/spec/Staging/auth/changes/add-2fa",
+  "proposal_file": "/abs/path/spec/Staging/auth/changes/add-2fa/proposal.md",
+  "design_file":   "/abs/path/spec/Staging/auth/changes/add-2fa/design.md",
+  "spec_file":     "/abs/path/spec/Staging/auth/changes/add-2fa/add-2fa_spec.md",
+  "task_file":     "/abs/path/spec/Staging/auth/changes/add-2fa/add-2fa_task.md" }
+```
+
+`design_file` is `null` when `design` was omitted.
+
+### `change_list`
+
+List every change directly under `spec/<area>/<topic>/changes/` (and optionally everything under `changes/archive/`). Each entry's status is computed from the task file's `- [ ]` / `- [x]` checkboxes.
+
+**Required:** `topic`. **Optional:** `area` (default `"Staging"`), `include_archived` (default `false`).
+
+Status values:
+- `proposed` — task file has no checkboxes yet, or none are completed
+- `in-progress` — some boxes checked, some not
+- `complete` — all boxes checked
+- `archived` — change lives under `changes/archive/` (only returned when `include_archived: true`)
+
+**Request:**
+```json
+{ "name": "change_list", "arguments": {
+    "topic": "auth", "area": "Staging", "include_archived": true
+} }
+```
+
+**Response:**
+```json
+{ "success": true,
+  "topic": "auth", "area": "Staging", "count": 2,
+  "changes": [
+    { "name": "add-oauth", "status": "proposed",
+      "has_proposal": true, "has_design": false, "has_spec": true, "has_task": true },
+    { "name": "add-2fa", "status": "archived",
+      "has_proposal": true, "has_design": true, "has_spec": true, "has_task": true }
+  ] }
+```
+
+### `change_archive`
+
+Move a change directory from `changes/<change>/` to `changes/archive/<change>/`. Errors if the source change doesn't exist or if `changes/archive/<change>/` already exists.
+
+**Required:** `topic`, `change`. **Optional:** `area` (default `"Staging"`).
+
+**Request:**
+```json
+{ "name": "change_archive", "arguments": {
+    "topic": "auth", "area": "Staging", "change": "add-2fa"
+} }
+```
+
+**Response:**
+```json
+{ "success": true,
+  "message": "Change 'add-2fa' archived",
+  "topic": "auth", "area": "Staging", "change": "add-2fa",
+  "from": "/abs/path/spec/Staging/auth/changes/add-2fa",
+  "to":   "/abs/path/spec/Staging/auth/changes/archive/add-2fa" }
 ```
 
 ## Readiness queue

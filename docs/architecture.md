@@ -20,13 +20,14 @@ There are two top-level user-facing surfaces, **CLI** and **MCP**. Both call int
 
 ## Single source of truth for shared logic
 
-Three shared command modules expose pure functions that both the CLI and the MCP server call:
+Four shared command modules expose pure functions that both the CLI and the MCP server call:
 
 | Module | Public functions | Called by |
 |--------|------------------|-----------|
 | `src/commands/topic.rs` | `run_new`, `run_push`, `run_pull`, `run_show`, `run_list`, `run_delete`, `run_progress`, `auto_checkin`, `auto_checkout` | CLI `topic *`, MCP `topics_*` |
 | `src/commands/spec.rs` | `run_spec_add` | CLI `spec add`, MCP `spec_add` |
 | `src/commands/queue.rs` | `run_queue_add` (returns `QueueAddOutput`) | CLI `queue add`, MCP `queue_add` |
+| `src/commands/change.rs` | `run_change_add`, `run_change_list`, `run_change_archive` | CLI `change *`, MCP `change_*` |
 
 This means a behaviour change to (e.g.) `run_spec_add` automatically applies to both CLI and MCP — there's no duplication to keep in sync. Earlier branches had inline copies in `server.rs`; PR4 / PR7 refactored them out.
 
@@ -46,7 +47,7 @@ Side effects (platypus mascot triggers, success banners) happen in `main.rs` aft
 2. The server reads a byte stream from stdin, parsing one complete JSON object per request via a hand-rolled brace-counter (handles `\` escapes and string boundaries).
 3. `handle_request` matches `method`:
    - `initialize` → version handshake.
-   - `tools/list` → returns the static tool catalog from `src/mcp/mod.rs::get_tools()` (31 entries).
+   - `tools/list` → returns the static tool catalog from `src/mcp/mod.rs::get_tools()` (34 entries).
    - `tools/call` → routes to `call_tool(name, args)`.
 4. `call_tool` is one large `match name` dispatch. Each arm reads required args, calls into shared `src/commands/<feature>.rs` functions or thin module helpers, and returns a JSON response.
 5. The server writes each response back as a single JSON line to stdout (Zed/Claude Code/MCP standard).
@@ -66,7 +67,14 @@ If neither matches: `Err("Unknown tool: <name>")`. (This was a major source of b
 │   │   └── <topic>/
 │   │       ├── topic.md                  # written by `topic add`
 │   │       ├── <topic-safe>_spec.md      # written by `spec add` / `spec_write`
-│   │       └── <topic-safe>_task.md      # written by `spec add` / `task_write`
+│   │       ├── <topic-safe>_task.md      # written by `spec add` / `task_write`
+│   │       └── changes/                  # optional — written by `change add`
+│   │           ├── <change>/
+│   │           │   ├── proposal.md
+│   │           │   ├── design.md             # only if --design supplied
+│   │           │   ├── <change>_spec.md
+│   │           │   └── <change>_task.md
+│   │           └── archive/<archived-change>/   # written by `change archive`
 │   └── index.toml                        # topic ↔ path index (written by `index add`)
 └── .agent/
     ├── config.toml                       # active mode, default area, ingest config, connectors
@@ -125,6 +133,7 @@ All clap structs. The interesting enums:
 | `repo.rs` | `unispec pkg *` (community package repo). |
 | `set.rs` | `unispec set <area>` (sets `default_area` in config). |
 | `spec.rs` | `run_spec_add` shared function. |
+| `change.rs` | `run_change_add` / `run_change_list` / `run_change_archive`. Manages `spec/<area>/<topic>/changes/` — proposing, listing, and archiving per-topic feature additions without touching the original `<topic>_spec.md`. Inspired by OpenSpec's change folders. |
 | `topic.rs` | Heart of the CLI: `run_new`, `run_push`, `run_pull`, `run_show`, `run_list`, `run_delete`, `run_progress`, plus the auto-checkout/checkin helpers. |
 
 ### `src/fs/*.rs`

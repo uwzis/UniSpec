@@ -54,6 +54,73 @@ Show the master spec file.
 
     unispec spec show
 
+## change
+
+Change management for topics — see [change-management.md](change-management.md) for the full guide. Lets you propose features for an existing topic without overwriting its original spec.
+
+### change add
+Create a new change folder under `spec/<area>/<topic>/changes/<change>/`. The topic must already exist; the original `<topic>_spec.md` is not touched.
+
+    unispec change add --topic <name> --change <id> --proposal <text> --spec-content <body> --task-content <tasks> [--design <text>] [--area <area>]
+
+- `--topic, -t` — existing topic name (required)
+- `--change, -c` — change identifier, kebab-case recommended (e.g. `add-2fa`) (required)
+- `--proposal` — why this change exists; must be at least 11 characters (required)
+- `--spec-content` — new requirements introduced by this change; at least 11 characters; supports markdown bullets (required)
+- `--task-content` — new tasks introduced by this change; at least 11 characters; supports markdown bullets (required)
+- `--design` — optional technical-approach body
+- `--area, -a` — area the topic lives in; defaults to `.agent/config.toml`'s `area`, then `Staging`
+
+Files written:
+
+    spec/<Area>/<topic>/changes/<change>/
+    ├── proposal.md         # always written
+    ├── design.md           # only if --design supplied
+    ├── <change>_spec.md
+    └── <change>_task.md
+
+Example:
+
+    unispec change add \
+      --topic auth \
+      --change add-2fa \
+      --proposal "Protect high-value accounts with a second factor." \
+      --design "TOTP via authenticator apps; encrypted seed at rest." \
+      --spec-content "## 2FA requirements
+    - TOTP enrolment per user
+    - 8 recovery codes per user" \
+      --task-content "- [ ] Generate TOTP seeds
+    - [ ] Verify TOTP codes on login
+    - [ ] Issue and store recovery codes"
+
+### change list
+List all changes for a topic with their status (`proposed` / `in-progress` / `complete` / `archived`) and which files each one contains.
+
+    unispec change list --topic <name> [--area <area>] [--archived]
+
+- `--topic, -t` — topic name (required)
+- `--area, -a` — area name (defaults to config, then Staging)
+- `--archived` — also include changes under `changes/archive/`
+
+Example output:
+
+    Changes for 'auth' in Staging/:
+      - add-2fa [in-progress] (proposal, design, spec, task)
+      - add-oauth [proposed] (proposal, spec, task)
+
+### change archive
+Move a completed change into `changes/archive/<change>/`. Fails if the change doesn't exist or if a directory with the same name already exists under `archive/`.
+
+    unispec change archive --topic <name> --change <id> [--area <area>]
+
+- `--topic, -t` — topic name (required)
+- `--change, -c` — change name to archive (required)
+- `--area, -a` — area name (defaults to config, then Staging)
+
+Example:
+
+    unispec change archive --topic auth --change add-2fa
+
 ## queue
 
 ### queue add

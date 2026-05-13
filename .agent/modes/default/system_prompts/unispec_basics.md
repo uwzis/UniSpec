@@ -15,7 +15,10 @@ Do **not** create or edit `topic.md`, `<topic>_spec.md`, or `<topic>_task.md` wi
 | Read a template | `read_asset { topic: "templates", asset_type: "topic"|"spec"|"task"|"area" }` | |
 | Read an artifact | `read_asset { topic, asset_type, area? }` or `unispec_read_spec { topic, area? }` | |
 | Create a topic | `topics_add { topic, area, short, content }` | `content` ≥ 10 chars. Don't include `---` — server writes it. |
-| Create spec + tasks together | `spec_add { topic, area, short, spec_content, task_content }` | Both content fields ≥ 10 chars. |
+| Create spec + tasks together | `spec_add { topic, area, short, spec_content, task_content }` | **Call once per topic — the first spec only.** Both content fields ≥ 10 chars. Will silently overwrite if rerun; when `<topic>_spec.md` already exists, use `change_add` instead. |
+| Add a feature to an existing topic | `change_add { topic, change, proposal, spec_content, task_content, area?, design? }` | Writes under `spec/<area>/<topic>/changes/<change>/`. Does **not** touch the original spec. Refuses to overwrite an existing change folder. Use this whenever the topic already has a spec; `spec_add` is for first specs only. See `docs/change-management.md`. |
+| List a topic's changes | `change_list { topic, area?, include_archived? }` | Returns each change's status (`proposed` / `in-progress` / `complete` / `archived`). |
+| Archive a completed change | `change_archive { topic, change, area? }` | Moves `changes/<change>/` to `changes/archive/<change>/`. |
 | Overwrite spec | `spec_write { topic, area?, content }` | |
 | Overwrite tasks | `task_write { topic, area?, content }` | Fails without an existing spec. |
 | Flip a checkbox | `tasks_complete { topic, task_index, area? }` / `tasks_incomplete { … }` | 0-based index. |
@@ -32,6 +35,9 @@ CLI equivalents for the most common write tools (use these when the editor's MCP
 
 - `unispec topic add <name> --short "..." --content "..." [--area <area>]`
 - `unispec spec add --topic <name> --short "..." --spec-content "..." --task-content "..." [--area <area>]`
+- `unispec change add --topic <name> --change <id> --proposal "..." [--design "..."] --spec-content "..." --task-content "..." [--area <area>]`
+- `unispec change list --topic <name> [--area <area>] [--archived]`
+- `unispec change archive --topic <name> --change <id> [--area <area>]`
 - `unispec queue add <topic> [--area <area>] [--position <n>]`
 - `unispec topic push <topic> --area <target> --from <source>`
 

@@ -95,6 +95,40 @@ unispec spec add \
 - [ ] Write tests"
 ```
 
+### Adding more features to an existing topic — use `change add`, not `spec add`
+
+Once a topic has a spec, **don't** call `unispec spec add` again to layer on more requirements — it will silently overwrite `user-login_spec.md` and `user-login_task.md`, losing your original design. Instead, propose a *change*:
+
+```bash
+unispec change add \
+  --topic user-login \
+  --change add-2fa \
+  --proposal "Protect high-value accounts with a second factor." \
+  --design "TOTP via authenticator apps; encrypted seed at rest." \
+  --spec-content "## 2FA requirements
+- TOTP enrolment per user
+- 8 recovery codes per user" \
+  --task-content "- [ ] Generate TOTP seeds
+- [ ] Verify TOTP codes on login
+- [ ] Issue and store recovery codes"
+```
+
+This writes a new folder `spec/Staging/user-login/changes/add-2fa/` containing `proposal.md`, `design.md`, `add-2fa_spec.md`, and `add-2fa_task.md`. The original `user-login_spec.md` and `user-login_task.md` are untouched.
+
+To see what changes are pending:
+
+```bash
+unispec change list --topic user-login
+```
+
+When the change ships, archive it:
+
+```bash
+unispec change archive --topic user-login --change add-2fa
+```
+
+See [change-management.md](change-management.md) for the full guide.
+
 ---
 
 ## File layout the tools create
@@ -172,7 +206,13 @@ unispec topic add <name> --short "..." \
 unispec topic list                             # list topics in the default area
 unispec topic progress                         # task progress per area
 unispec spec add --topic <name> --short "..." \
-  --spec-content "..." --task-content "..."    # write spec + task files
+  --spec-content "..." --task-content "..."    # write spec + task files (first time only)
+unispec change add --topic <name> --change <id> \
+  --proposal "..." --spec-content "..." \
+  --task-content "..."                          # add a feature to an existing topic
+unispec change list --topic <name>             # list pending changes for a topic
+unispec change archive --topic <name> \
+  --change <id>                                 # mark a change complete
 unispec queue add <name>                       # add to the area readiness queue
 unispec topic push <name> --area <target> \
   --from <source>                              # move between areas
@@ -235,6 +275,7 @@ See [indexing.md](indexing.md) for the full feature set.
 
 - [Quickstart](quickstart.md) — same content, five minutes, copy-pasteable
 - [Workflow](workflow.md) — the five-area pipeline rules
+- [Change Management](change-management.md) — adding features to existing topics without overwriting the spec
 - [Areas](areas.md) — what each area is for
 - [TUI Guide](tui.md) — every keybinding and screen
 - [CLI Reference](cli-reference.md) — every subcommand and flag (the up-to-date reference)

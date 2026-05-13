@@ -100,6 +100,53 @@ spec/<Area>/<topic>/
 
 Nested topics are real directories. Pushing the parent does **not** push the children — each child is its own pipeline traversal.
 
+## Change management — adding features without rewriting the spec
+
+When a topic already exists and someone wants to add a new feature on top of it, the answer is **not** to rewrite `<topic>_spec.md`. Instead, create a *change* — a sibling folder under the topic that contains its own proposal, optional design note, and dedicated spec / task pair. The original spec stays the source of truth.
+
+The on-disk layout becomes:
+
+```
+spec/<Area>/<topic>/
+├── topic.md
+├── <topic>_spec.md         ← original requirements, never modified
+├── <topic>_task.md         ← original tasks
+└── changes/
+    ├── add-2fa/
+    │   ├── proposal.md     ← why this change exists
+    │   ├── design.md       ← optional technical approach
+    │   ├── add-2fa_spec.md ← new requirements only
+    │   └── add-2fa_task.md ← new tasks only
+    ├── add-oauth/
+    │   ├── proposal.md
+    │   ├── add-oauth_spec.md
+    │   └── add-oauth_task.md
+    └── archive/
+        └── add-2fa/        ← archived after completion
+```
+
+### Lifecycle
+
+1. **Propose** — `change_add` writes `proposal.md` (and optionally `design.md`) plus a fresh spec/task pair under `changes/<change>/`. Status starts as `proposed`.
+2. **Implement** — as agents tick off `- [x]` in `<change>_task.md`, `change_list` reports the change as `in-progress`, then `complete` when every box is checked.
+3. **Archive** — `change_archive` moves `changes/<change>/` into `changes/archive/<change>/` once the change has landed. Archived changes stay diffable and traceable but are no longer surfaced as live work.
+
+### When to use `change add` vs `spec add`
+
+| You want to… | Use |
+|--------------|-----|
+| Spec out a brand-new topic for the first time | `spec_add` (or CLI `unispec spec add`) |
+| Add a feature to a topic that already has a spec | `change_add` (or CLI `unispec change add`) |
+| Rework requirements that were already shipped | Pull the topic back via `topics_pull`, then `change_add` once it's in Staging |
+
+`spec_add` writes to the topic root and refuses to overwrite. `change_add` writes under `changes/<change>/` and leaves the root alone — this is the *only* way to layer additions onto a topic without losing history.
+
+### Changes travel with the topic
+
+`changes/` lives inside the topic directory, so `topics_push` carries it (and `changes/archive/`) into every downstream area unchanged. A change proposed in Staging follows the topic into Working, Testing, Fixing, and Build with no extra work — its files move byte-for-byte.
+
+See [change-management.md](change-management.md) for the full guide with worked examples.
+
 ## Backflow: `pull`
 
 If a topic in `Build` is found to have a bug, pull it back:
