@@ -1,5 +1,6 @@
 // src/commands/mod.rs
 pub mod area;
+pub mod change;
 pub mod index;
 pub mod ingest;
 pub mod init;

@@ -458,6 +458,13 @@ impl App {
                         let items: Vec<ListItem> = self.state.topics.iter().enumerate().map(|(i, t)| {
                             let style = if Some(i) == self.list_state.selected() { Style::default().fg(Color::Yellow) } else { Style::default() };
 
+                            let change_prefix = if t.is_changes_container {
+                                "📁🔀 "
+                            } else if t.is_change {
+                                "🔀 "
+                            } else {
+                                ""
+                            };
                             let display_line = match t.area_type {
                                 crate::agent::mode::DisplayType::Roadmap => {
                                     let impact = t.metadata.impact.as_deref().unwrap_or("");
@@ -552,6 +559,12 @@ impl App {
 
                                     format!("{} {} {} {} ({}/{}){}{}{}", topic_display, status_icon, bar, animation, t.tasks_completed, t.tasks_total, arrow, checkout_info, progress_str)
                                 }
+                            };
+
+                            let display_line = if change_prefix.is_empty() {
+                                display_line
+                            } else {
+                                format!("{}{}", change_prefix, display_line)
                             };
 
                             ListItem::new(display_line).style(style)

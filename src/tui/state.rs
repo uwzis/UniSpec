@@ -19,6 +19,11 @@ pub struct TopicNode {
     pub is_checked_out: bool,
     pub checked_out_by: Option<String>,
     pub short: String,
+    /// True when this node lives inside a topic's `changes/` subtree
+    /// (or `changes/archive/`).
+    pub is_change: bool,
+    /// True for the `changes/` directory itself (the container).
+    pub is_changes_container: bool,
 }
 
 impl TopicNode {
@@ -180,6 +185,7 @@ impl AppState {
                             area.to_string(),
                             area_type.clone(),
                             &spec_file,
+                            false,
                         )?);
                     }
                 }
@@ -333,8 +339,11 @@ impl AppState {
         area: String,
         area_type: DisplayType,
         spec_file: &str,
+        in_changes_subtree: bool,
     ) -> Result<TopicNode> {
         let topic = path.file_name().unwrap().to_string_lossy().to_string();
+        let is_changes_container = !in_changes_subtree && topic == "changes";
+        let child_in_changes = in_changes_subtree || is_changes_container;
 
         let mut children = vec![];
         if path.exists() {
@@ -347,6 +356,7 @@ impl AppState {
                         area.clone(),
                         area_type.clone(),
                         spec_file,
+                        child_in_changes,
                     )?);
                 } else if let Some(filename) = path.file_name().and_then(|f| f.to_str()) {
                     if filename.ends_with("_spec.md") {
@@ -376,6 +386,8 @@ impl AppState {
                             is_checked_out: false,
                             checked_out_by: None,
                             short: spec_short,
+                            is_change: in_changes_subtree,
+                            is_changes_container: false,
                         });
                     }
                 }
@@ -422,6 +434,8 @@ impl AppState {
             is_checked_out,
             checked_out_by,
             short: String::new(),
+            is_change: in_changes_subtree && !is_changes_container,
+            is_changes_container,
         })
     }
 
@@ -544,6 +558,7 @@ impl AppState {
                         area.clone(),
                         area_type.clone(),
                         &spec_file,
+                        false,
                     )?);
                 }
             }

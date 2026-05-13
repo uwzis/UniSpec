@@ -187,6 +187,9 @@ pub enum Commands {
     /// Readiness queue commands (add)
     #[command(subcommand)]
     Queue(QueueCommands),
+    /// Change management commands (add, list, archive)
+    #[command(subcommand)]
+    Change(ChangeCommands),
     /// Agent mode commands
     #[command(subcommand)]
     Mode(ModeCommands),
@@ -419,6 +422,63 @@ pub enum QueueCommands {
         /// to the end (default).
         #[arg(short, long, default_value_t = -1)]
         position: i32,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ChangeCommands {
+    /// Create a new change folder inside a topic. The original spec is left
+    /// untouched; a new `changes/<change>/` directory is written with
+    /// proposal.md, an optional design.md, and dedicated spec/task files.
+    Add {
+        /// Topic the change applies to
+        #[arg(short, long)]
+        topic: String,
+        /// Change identifier (e.g. "add-2fa")
+        #[arg(short, long)]
+        change: String,
+        /// Area the topic lives in. Defaults to the `area` field in
+        /// `.agent/config.toml`, or "Staging" if no config exists.
+        #[arg(short, long)]
+        area: Option<String>,
+        /// Proposal body (why this change exists). Required, ≥ 11 chars.
+        #[arg(long, allow_hyphen_values = true)]
+        proposal: String,
+        /// Optional technical design body.
+        #[arg(long, allow_hyphen_values = true)]
+        design: Option<String>,
+        /// Spec body for the new requirements introduced by this change.
+        /// Required, ≥ 11 chars.
+        #[arg(long, allow_hyphen_values = true)]
+        spec_content: String,
+        /// Task body for the new tasks introduced by this change.
+        /// Required, ≥ 11 chars.
+        #[arg(long, allow_hyphen_values = true)]
+        task_content: String,
+    },
+    /// List all changes for a topic.
+    List {
+        /// Topic to list changes for
+        #[arg(short, long)]
+        topic: String,
+        /// Area the topic lives in (default from config or Staging)
+        #[arg(short, long)]
+        area: Option<String>,
+        /// Include archived changes
+        #[arg(long)]
+        archived: bool,
+    },
+    /// Archive a change (mark it complete and move into changes/archive/).
+    Archive {
+        /// Topic the change lives under
+        #[arg(short, long)]
+        topic: String,
+        /// Change name to archive
+        #[arg(short, long)]
+        change: String,
+        /// Area the topic lives in (default from config or Staging)
+        #[arg(short, long)]
+        area: Option<String>,
     },
 }
 

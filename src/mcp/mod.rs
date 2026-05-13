@@ -316,6 +316,50 @@ pub fn get_tools() -> Vec<Tool> {
                 "required": ["topic", "new_position"]
             }),
         },
+        // === Change Management ===
+        Tool {
+            name: "change_add".to_string(),
+            description: "Create a change folder inside a topic (does NOT modify the original spec). Writes proposal.md, optional design.md, <change>_spec.md, and <change>_task.md under spec/<area>/<topic>/changes/<change>/. Required: topic, change, proposal, spec_content, task_content. Optional: area (default Staging), design.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "topic": { "type": "string", "description": "Existing topic name" },
+                    "area": { "type": "string", "description": "Area name (default: Staging)" },
+                    "change": { "type": "string", "description": "Change identifier, e.g. 'add-2fa'" },
+                    "proposal": { "type": "string", "description": "Why this change is being added (≥ 11 chars)" },
+                    "design": { "type": "string", "description": "Optional technical approach" },
+                    "spec_content": { "type": "string", "description": "New requirements introduced by this change (≥ 11 chars)" },
+                    "task_content": { "type": "string", "description": "New tasks introduced by this change (≥ 11 chars)" }
+                },
+                "required": ["topic", "change", "proposal", "spec_content", "task_content"]
+            }),
+        },
+        Tool {
+            name: "change_list".to_string(),
+            description: "List all changes for a topic. Set include_archived=true to also list changes under changes/archive/.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "topic": { "type": "string", "description": "Topic name" },
+                    "area": { "type": "string", "description": "Area name (default: Staging)" },
+                    "include_archived": { "type": "boolean", "description": "Include archived changes (default: false)" }
+                },
+                "required": ["topic"]
+            }),
+        },
+        Tool {
+            name: "change_archive".to_string(),
+            description: "Mark a change as complete by moving it into changes/archive/.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "topic": { "type": "string", "description": "Topic name" },
+                    "area": { "type": "string", "description": "Area name (default: Staging)" },
+                    "change": { "type": "string", "description": "Change name to archive" }
+                },
+                "required": ["topic", "change"]
+            }),
+        },
         // === Index Actions (Bind) ===
         Tool {
             name: "index_add".to_string(),

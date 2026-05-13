@@ -13,12 +13,14 @@ use clap::Parser;
 
 use crate::agent::{connector as agent_connector, mode as agent_mode};
 use crate::cli::{
-    AreaCommands, AreaOrderCommands, AutoCommands, ConnectorCommands, IndexCommands,
-    IngestCommands, ModeCommands, OrderCommands, ParseCommands, PattyCommands, PkgCommands,
-    QueueCommands, SpecCommands, TopicCommands,
+    AreaCommands, AreaOrderCommands, AutoCommands, ChangeCommands, ConnectorCommands,
+    IndexCommands, IngestCommands, ModeCommands, OrderCommands, ParseCommands, PattyCommands,
+    PkgCommands, QueueCommands, SpecCommands, TopicCommands,
 };
 use crate::cli::{Cli, Commands};
-use crate::commands::{area, index, ingest, init, init_editor, queue, repo, set, spec, topic};
+use crate::commands::{
+    area, change, index, ingest, init, init_editor, queue, repo, set, spec, topic,
+};
 
 fn get_show_platypus() -> bool {
     crate::fs::config::get_paddy_enabled().unwrap_or(true)
@@ -401,6 +403,92 @@ fn main() -> Result<()> {
                 );
                 if get_show_platypus() {
                     platypus::happy();
+                }
+            }
+        },
+        Some(Commands::Change(change_cmd)) => match change_cmd {
+            ChangeCommands::Add {
+                topic,
+                change: change_name,
+                area,
+                proposal,
+                design,
+                spec_content,
+                task_content,
+            } => {
+                let area = resolve_area_from_config(area);
+                let out = change::run_change_add(
+                    &topic,
+                    Some(&area),
+                    &change_name,
+                    &proposal,
+                    design.as_deref(),
+                    &spec_content,
+                    &task_content,
+                )?;
+                println!(
+                    "✅ Change '{}' created for topic '{}' in {}/\n  {}\n  {}\n  {}{}",
+                    out.change,
+                    out.topic,
+                    out.area,
+                    out.proposal_path.display(),
+                    out.spec_path.display(),
+                    out.task_path.display(),
+                    out.design_path
+                        .as_ref()
+                        .map(|p| format!("\n  {}", p.display()))
+                        .unwrap_or_default()
+                );
+                if get_show_platypus() {
+                    platypus::happy();
+                }
+            }
+            ChangeCommands::List {
+                topic,
+                area,
+                archived,
+            } => {
+                let area = resolve_area_from_config(area);
+                let changes = change::run_change_list(&topic, Some(&area), archived)?;
+                if changes.is_empty() {
+                    println!("No changes for '{}' in {}/", topic, area);
+                } else {
+                    println!("Changes for '{}' in {}/:", topic, area);
+                    for c in &changes {
+                        let mut bits = vec![];
+                        if c.has_proposal {
+                            bits.push("proposal");
+                        }
+                        if c.has_design {
+                            bits.push("design");
+                        }
+                        if c.has_spec {
+                            bits.push("spec");
+                        }
+                        if c.has_task {
+                            bits.push("task");
+                        }
+                        println!("  - {} [{}] ({})", c.name, c.status, bits.join(", "));
+                    }
+                }
+            }
+            ChangeCommands::Archive {
+                topic,
+                change: change_name,
+                area,
+            } => {
+                let area = resolve_area_from_config(area);
+                let out = change::run_change_archive(&topic, Some(&area), &change_name)?;
+                println!(
+                    "✅ Archived change '{}' for topic '{}' in {}/\n  {} -> {}",
+                    out.change,
+                    out.topic,
+                    out.area,
+                    out.from.display(),
+                    out.to.display()
+                );
+                if get_show_platypus() {
+                    platypus::celebrating();
                 }
             }
         },
