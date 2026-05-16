@@ -529,6 +529,235 @@ unispec spec show [name]
 
 ---
 
+## Change
+
+Manage per-topic change folders (`spec/<area>/<topic>/changes/`). Used to propose new features for a topic that already has a spec, without overwriting the original. See [change-management.md](change-management.md) for the full guide.
+
+```bash
+unispec change <subcommand>
+```
+
+### Subcommands
+
+#### Add
+
+Create a new change folder inside an existing topic. Writes `proposal.md`, optional `design.md`, `<change>_spec.md`, and `<change>_task.md` under `spec/<area>/<topic>/changes/<change>/`. The topic's original `<topic>_spec.md` and `<topic>_task.md` are not touched.
+
+```bash
+unispec change add --topic <name> --change <id> --proposal <text> \
+  --spec-content <body> --task-content <tasks> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-t, --topic <name>` | Required. Existing topic name. |
+| `-c, --change <id>` | Required. Change identifier (kebab-case recommended, e.g. `add-2fa`). |
+| `--proposal <text>` | Required. Why this change exists (≥ 11 chars). `allow_hyphen_values` enabled — markdown bullets are allowed. |
+| `--spec-content <body>` | Required. New requirements (≥ 11 chars). `allow_hyphen_values` enabled. |
+| `--task-content <tasks>` | Required. New tasks (≥ 11 chars). `allow_hyphen_values` enabled. |
+| `--design <text>` | Optional. Technical-approach body. When present, writes `design.md`. |
+| `-a, --area <area>` | Area the topic lives in. Defaults to config's `area`, then `"Staging"`. |
+
+**Example:**
+```bash
+unispec change add \
+  --topic auth \
+  --change add-2fa \
+  --proposal "Protect high-value accounts with a second factor." \
+  --design "TOTP via authenticator apps; encrypted seed at rest." \
+  --spec-content "## 2FA requirements
+- TOTP enrolment per user
+- 8 recovery codes per user" \
+  --task-content "- [ ] Generate TOTP seeds
+- [ ] Verify TOTP codes on login
+- [ ] Issue and store recovery codes"
+```
+
+**Failure modes.**
+- Topic doesn't exist → `Topic '<name>' does not exist in area '<area>'`.
+- Change folder already present → `Change '<X>' already exists for topic '<topic>' in area '<area>'`.
+- Any required content field shorter than 11 trimmed chars → length validation error.
+
+#### List
+
+List every change for a topic with its status and which files it contains.
+
+```bash
+unispec change list --topic <name> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-t, --topic <name>` | Required. Topic to list changes for. |
+| `-a, --area <area>` | Area name. Defaults to config's `area`, then `"Staging"`. |
+| `--archived` | Also include changes under `changes/archive/`. |
+
+Statuses come from the change's task file:
+- `proposed` — task file has no `- [ ]` / `- [x]` lines yet, or none are completed.
+- `in-progress` — some `- [x]` boxes, but not all.
+- `complete` — every `- [ ]` line is `- [x]`.
+- `archived` — change lives under `changes/archive/` (only surfaced with `--archived`).
+
+**Example output:**
+```
+Changes for 'auth' in Staging/:
+  - add-2fa [in-progress] (proposal, design, spec, task)
+  - add-oauth [proposed] (proposal, spec, task)
+```
+
+#### Archive
+
+Move a change directory from `changes/<change>/` to `changes/archive/<change>/`, **merging any delta sections into the canonical `<topic>_spec.md` first**. Used when a change has been fully implemented and you want it out of the live change list.
+
+```bash
+unispec change archive --topic <name> --change <id> [OPTIONS]
+```
+
+**Delta merge on archive.** If the change's `<change>_spec.md` contains any of these top-level sections, the canonical spec is rewritten with the edits applied (RENAMED → REMOVED → MODIFIED → ADDED) before the directory move:
+
+```markdown
+## ADDED Requirements
+### Requirement: <name>
+<content>
+
+## MODIFIED Requirements
+### Requirement: <existing name>
+<new content that replaces the old block>
+
+## REMOVED Requirements
+### Requirement: <name>
+**Reason:** <why>
+
+## RENAMED Requirements
+- FROM: ### Requirement: Old Name
+- TO: ### Requirement: New Name
+```
+
+A change spec with no delta sections is archived without touching the canonical spec (backward compatible). See [change-management.md](change-management.md) for the full delta grammar.
+
+| Option | Description |
+|--------|-------------|
+| `-t, --topic <name>` | Required. Topic name. |
+| `-c, --change <id>` | Required. Change name to archive. |
+| `-a, --area <area>` | Area name. Defaults to config's `area`, then `"Staging"`. |
+
+**Example:**
+```bash
+unispec change archive --topic auth --change add-2fa
+```
+
+**Failure modes.**
+- Source change doesn't exist → `Change '<X>' does not exist for topic '<topic>' in area '<area>'`.
+- An archived change with the same name already exists → `Archived change '<X>' already exists; refusing to overwrite`.
+
+The MCP `change_add`, `change_list`, and `change_archive` tools expose the same logic programmatically — see [mcp-tools-reference.md](mcp-tools-reference.md#change-management).
+
+---
+
+## Next
+
+Get a structured next-action payload for a topic. The recommended entry point whenever an agent or human needs to know what to do next on a topic.
+
+```bash
+unispec next --topic <name> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-t, --topic <name>` | Required. Topic to analyse. |
+| `-a, --area <area>` | Area name. Defaults to config's `area`, then `"Staging"`. |
+| `--json` | Emit the full payload as JSON instead of the human summary. |
+
+The payload returns: `status` (one of `not-started` / `in-progress` / `complete` / `blocked`), `open_tasks[]` + `completed_tasks[]` (each task carries `index`, `text`, `from_change`), `pending_changes[]` + `archived_changes[]`, `context_files[]` (relative paths to read), `rules[]` (area-specific constraints), `next_action` (one sentence), `blockers[]`.
+
+The MCP tool `next { topic, area? }` returns the same shape. See [mcp-tools-reference.md](mcp-tools-reference.md#next-structured-agent-feed).
+
+---
+
+## Analyze
+
+Cross-artifact consistency checker. Read-only.
+
+```bash
+unispec analyze --topic <name> [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-t, --topic <name>` | Required. Topic to analyse. |
+| `-a, --area <area>` | Area name. Defaults to config, then `"Staging"`. |
+| `--json` | Emit findings as JSON. |
+
+Runs six checks against the topic's spec, task, and every pending change:
+
+| # | Check | Severity |
+|---|-------|----------|
+| 1 | Duplication of requirements between canonical spec and a pending change | WARNING |
+| 2 | `### Requirement:` rows with no task line referencing them | ERROR |
+| 3 | Ambiguous language (`fast / secure / scalable / easy / simple / good / better / best / quick`) without a metric | WARNING |
+| 4 | Empty `## <heading>` sections | WARNING |
+| 5 | Constitution alignment (surfaces version, agent evaluates manually) | INFO |
+| 6 | Overall task completion ratio | INFO |
+
+Exits 0 even when findings are present; severity is reported in the summary line. The MCP tool `analyze { topic, area? }` returns the same structured findings.
+
+---
+
+## Workspace
+
+Multi-repo coordination across linked UniSpec projects.
+
+```bash
+unispec workspace <subcommand>
+```
+
+### Subcommands
+
+#### Init
+
+Create `.unispec-workspace/workspace.yaml` in the current directory.
+
+```bash
+unispec workspace init <name>
+```
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Workspace name (written to the YAML's `name:` field). |
+
+#### Link
+
+Add a named pointer to another UniSpec project.
+
+```bash
+unispec workspace link <name> <path>
+```
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Short name to reference the repo by (e.g. `api`, `web`). |
+| `path` | Path to the project root. Stored as absolute. |
+
+#### List
+
+List linked repos with status flags (does the path exist? does it have a `spec/` and `.agent/`?).
+
+```bash
+unispec workspace list
+```
+
+#### Status
+
+Combined view of every topic across every linked repo.
+
+```bash
+unispec workspace status [--json]
+```
+
+Without `--json`, prints one line per topic prefixed by its area. With `--json`, returns the same structured payload the `workspace_status` MCP tool returns.
+
+---
+
 ## Queue
 
 Manage area readiness queues (`spec/<area>/queue.md`). Topics in `Staging` and `Fixing` must be listed in the queue before `topic push` will move them out.
@@ -750,7 +979,7 @@ unispec mcp /path/to/project
 
 ### MCP Tools Available
 
-When the MCP server is running, it exposes 31 built-in tools plus one dynamic `unispec_<name>` tool per configured connector. See [MCP Documentation](mcp.md) for the full schema of each tool.
+When the MCP server is running, it exposes 39 built-in tools plus one dynamic `unispec_<name>` tool per configured connector. See [MCP Documentation](mcp.md) for the full schema of each tool.
 
 Tools the server publishes (real names, used verbatim by agents):
 
@@ -758,6 +987,11 @@ Tools the server publishes (real names, used verbatim by agents):
 - Topics: `topics_list`, `topics_add`, `topics_show`, `topics_delete`, `topics_push`, `topics_pull`, `topics_progress`
 - Reading: `read_asset`, `unispec_read_spec`
 - Specs & tasks: `spec_add`, `spec_write`, `task_write`, `task_status`, `tasks_list`, `tasks_complete`, `tasks_incomplete`
+- Change management: `change_add`, `change_list`, `change_archive`
+- Agent feed: `next`
+- Analysis: `analyze`
+- Constitution: `constitution_read`, `constitution_check`
+- Workspace: `workspace_status`
 - Notes: `notes_read`, `notes_add`
 - Queue: `queue_list`, `queue_add`, `queue_remove`, `queue_check`, `queue_reorder`
 - Index: `index_add`, `index_find`, `index_lookup`, `index_list`, `index_graph`, `index_backlinks`, `unispec_bind_spec`

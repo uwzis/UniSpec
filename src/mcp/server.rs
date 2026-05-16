@@ -1143,6 +1143,171 @@ fn call_tool(name: &str, args: &Value) -> Result<Value> {
                 "task_file": out.task_file
             }))
         }
+        // === Workspace ===
+        "workspace_status" => {
+            let (name, repos) =
+                crate::commands::workspace::run_status(std::path::Path::new("."))?;
+            Ok(json!({
+                "success": true,
+                "workspace": name,
+                "repos": repos
+            }))
+        }
+        // === Analyze ===
+        "analyze" => {
+            let topic = args
+                .get("topic")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("analyze requires 'topic'"))?;
+            let area = args.get("area").and_then(|v| v.as_str());
+            let out = crate::commands::analyze::run_analyze(topic, area)?;
+            let mut value = serde_json::to_value(&out)?;
+            if let Value::Object(ref mut map) = value {
+                map.insert("success".to_string(), json!(true));
+            }
+            Ok(value)
+        }
+        // === Constitution ===
+        "constitution_read" => {
+            let content = crate::commands::constitution::read_constitution()?;
+            let path = crate::commands::constitution::constitution_path();
+            Ok(json!({
+                "success": true,
+                "path": path.display().to_string(),
+                "content": content
+            }))
+        }
+        "constitution_check" => {
+            let action = args
+                .get("action")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("constitution_check requires 'action'"))?;
+            let out = crate::commands::constitution::check_against_constitution(action)?;
+            Ok(json!({
+                "success": true,
+                "action": out.action,
+                "constitution": out.constitution,
+                "note": out.note
+            }))
+        }
+        // === Next (structured agent feed) ===
+        "next" => {
+            let topic = args
+                .get("topic")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("next requires 'topic'"))?;
+            let area = args.get("area").and_then(|v| v.as_str());
+            let out = crate::commands::next::run_next(topic, area)?;
+            // Serialize the whole struct (it derives Serialize) and attach
+            // success: true. Using to_value avoids re-listing every field.
+            let mut value = serde_json::to_value(&out)?;
+            if let Value::Object(ref mut map) = value {
+                map.insert("success".to_string(), json!(true));
+            }
+            Ok(value)
+        }
+        // === Change Management ===
+        "change_add" => {
+            let topic = args
+                .get("topic")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("change_add requires 'topic'"))?;
+            let area = args.get("area").and_then(|v| v.as_str());
+            let change = args
+                .get("change")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("change_add requires 'change'"))?;
+            let proposal = args
+                .get("proposal")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("change_add requires 'proposal'"))?;
+            let design = args.get("design").and_then(|v| v.as_str());
+            let spec_content = args
+                .get("spec_content")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("change_add requires 'spec_content'"))?;
+            let task_content = args
+                .get("task_content")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("change_add requires 'task_content'"))?;
+
+            let out = crate::commands::change::run_change_add(
+                topic,
+                area,
+                change,
+                proposal,
+                design,
+                spec_content,
+                task_content,
+            )?;
+
+            Ok(json!({
+                "success": true,
+                "message": "Change folder created",
+                "topic": out.topic,
+                "area": out.area,
+                "change": out.change,
+                "change_dir": out.change_dir.display().to_string(),
+                "proposal_file": out.proposal_path.display().to_string(),
+                "design_file": out.design_path.as_ref().map(|p| p.display().to_string()),
+                "spec_file": out.spec_path.display().to_string(),
+                "task_file": out.task_path.display().to_string()
+            }))
+        }
+        "change_list" => {
+            let topic = args
+                .get("topic")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("change_list requires 'topic'"))?;
+            let area = args.get("area").and_then(|v| v.as_str());
+            let include_archived = args
+                .get("include_archived")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let changes = crate::commands::change::run_change_list(topic, area, include_archived)?;
+            let changes_json: Vec<Value> = changes
+                .iter()
+                .map(|c| {
+                    json!({
+                        "name": c.name,
+                        "status": c.status,
+                        "has_proposal": c.has_proposal,
+                        "has_design": c.has_design,
+                        "has_spec": c.has_spec,
+                        "has_task": c.has_task
+                    })
+                })
+                .collect();
+            let count = changes_json.len();
+            Ok(json!({
+                "success": true,
+                "topic": topic,
+                "area": area.unwrap_or("Staging"),
+                "changes": changes_json,
+                "count": count
+            }))
+        }
+        "change_archive" => {
+            let topic = args
+                .get("topic")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("change_archive requires 'topic'"))?;
+            let area = args.get("area").and_then(|v| v.as_str());
+            let change = args
+                .get("change")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("change_archive requires 'change'"))?;
+            let out = crate::commands::change::run_change_archive(topic, area, change)?;
+            Ok(json!({
+                "success": true,
+                "message": format!("Change '{}' archived", out.change),
+                "topic": out.topic,
+                "area": out.area,
+                "change": out.change,
+                "from": out.from.display().to_string(),
+                "to": out.to.display().to_string()
+            }))
+        }
         // === Queue List ===
         "queue_list" => {
             let area = args

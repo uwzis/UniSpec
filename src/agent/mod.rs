@@ -2,6 +2,7 @@
 pub mod auto;
 pub mod code_parser;
 pub mod connector;
+pub mod integrations;
 pub mod mode;
 
 use crate::fs::agent_dir;

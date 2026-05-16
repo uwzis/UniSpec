@@ -84,6 +84,105 @@ unispec spec add --topic=x --short=x \
 
 The success banner is the ASCII platypus; the `✅ Spec and task created for '<name>' in <area>/` line is printed by main.rs immediately before it. If your terminal is short, scroll up by one line.
 
+## Change management
+
+### `Error: Change '<name>' already exists for topic '<topic>' in area '<area>'`
+
+**Cause.** `change_add` (CLI `unispec change add`) refuses to overwrite an existing change folder under `spec/<area>/<topic>/changes/<change>/`. The folder might be there from a previous successful run, or from a half-completed prior call.
+
+**Fix.** Check what's on disk:
+
+```bash
+ls spec/<area>/<topic>/changes/
+```
+
+Then either:
+
+```bash
+# the existing folder is what you wanted — you're done
+unispec change list --topic <topic>
+
+# you want to start over: archive the old one, then add the new one
+unispec change archive --topic <topic> --change <name>
+unispec change add     --topic <topic> --change <name> ...
+
+# the existing folder is garbage; delete it by hand
+rm -rf spec/<area>/<topic>/changes/<name>
+unispec change add --topic <topic> --change <name> ...
+```
+
+### `Error: Topic '<name>' does not exist in area '<area>'` (from change_add)
+
+**Cause.** `change_add` requires the topic directory to exist first; it doesn't create the topic for you.
+
+**Fix.**
+
+```bash
+# Confirm what areas have the topic
+unispec topic show <name> --all
+
+# If no area has it: create it
+unispec topic add <name> --short "..." --content "..."
+
+# If it's in a different area: pass --area explicitly
+unispec change add --topic <name> --area <correct-area> --change ... --proposal ...
+```
+
+The resolver tries the area name as given and then lowercased, so `--area staging` and `--area Staging` both work. But it does not search across areas — pass the right one.
+
+### `Error: Change '<name>' does not exist for topic '<topic>' in area '<area>'` (from change_archive)
+
+**Cause.** `change_archive` couldn't find a directory at `spec/<area>/<topic>/changes/<name>/`. Either it was typo'd, already archived, or you're looking in the wrong area.
+
+**Fix.**
+
+```bash
+unispec change list --topic <topic> --archived
+```
+
+If it's already in `[archived]`, you're done — it was archived earlier. If it's nowhere, the name is wrong: `ls spec/<area>/<topic>/changes/` to see the actual directory names.
+
+### `Error: Archived change '<name>' already exists; refusing to overwrite` (from change_archive)
+
+**Cause.** There's already a `changes/archive/<name>/` from a previous archive. Refusing to overwrite is intentional — the previous archive could be the real history.
+
+**Fix.** Rename one of them before archiving:
+
+```bash
+mv spec/<area>/<topic>/changes/<name> spec/<area>/<topic>/changes/<name>-v2
+unispec change archive --topic <topic> --change <name>-v2
+```
+
+Or, if the old archive really is garbage, delete it manually and retry the archive.
+
+### `Error: 'proposal' must be at least 11 characters of actual text` (or `'spec_content'` / `'task_content'`)
+
+**Cause.** All three content fields are trimmed and checked for length > 10. An empty or near-empty value falls foul of this.
+
+**Fix.** Supply real content. The validation is intentional — a single-character proposal is never what the caller actually meant.
+
+### "I called `spec_add` on a topic that already had a spec — what happened?"
+
+**Reality.** `spec_add` does **not** error on overwrite. It silently writes new `<topic>_spec.md` and `<topic>_task.md` files, replacing whatever was there.
+
+**That's almost never what you wanted.** If the topic already has a spec and you want to add a feature, use `change_add` (or CLI `unispec change add`) instead. It writes under `spec/<area>/<topic>/changes/<change>/` and leaves the original spec intact.
+
+**To recover** if you've already overwritten:
+
+```bash
+git diff -- spec/<area>/<topic>/   # see what was lost
+git restore -- spec/<area>/<topic>/<topic>_spec.md spec/<area>/<topic>/<topic>_task.md
+```
+
+Then redo as a change:
+
+```bash
+unispec change add --topic <name> --change <feature-id> \
+  --proposal "..." --spec-content "..." --task-content "..."
+```
+
+See [change-management.md](change-management.md) for the full guide.
+
 ## TUI
 
 ### TUI shows old content after `Enter` returns from `nano`

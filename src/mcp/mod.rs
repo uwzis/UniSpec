@@ -316,6 +316,105 @@ pub fn get_tools() -> Vec<Tool> {
                 "required": ["topic", "new_position"]
             }),
         },
+        // === Workspace (multi-repo coordination) ===
+        Tool {
+            name: "workspace_status".to_string(),
+            description: "Return the combined topic list across every repo linked from `.unispec-workspace/workspace.yaml` in the server's current working directory. Requires the server to be launched inside a workspace root.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        // === Analyze (cross-artifact consistency) ===
+        Tool {
+            name: "analyze".to_string(),
+            description: "Run cross-artifact consistency checks against a topic: duplication, missing task coverage, ambiguous language, empty sections, constitution alignment, task completion. Required: topic. Optional: area (default Staging). Returns findings[] with ERROR / WARNING / INFO severities.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "topic": { "type": "string", "description": "Topic name" },
+                    "area": { "type": "string", "description": "Area name (default: Staging)" }
+                },
+                "required": ["topic"]
+            }),
+        },
+        // === Constitution ===
+        Tool {
+            name: "constitution_read".to_string(),
+            description: "Return the contents of `.agent/constitution.md` — the project's non-negotiable principles. Call this before any action that could violate governance.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        Tool {
+            name: "constitution_check".to_string(),
+            description: "Pair the constitution text with a proposed action so the agent can self-evaluate. Required: action (one-sentence description of what you're about to do).".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "action": { "type": "string", "description": "What the agent is about to do" }
+                },
+                "required": ["action"]
+            }),
+        },
+        // === Next (structured agent feed) ===
+        Tool {
+            name: "next".to_string(),
+            description: "Get a structured next-action payload for a topic. Call this BEFORE every action on a topic — it composes spec/task state, pending changes, queue gating, and area conventions into one decision-grade response with status, open_tasks, pending_changes, context_files, rules, next_action, and blockers. Required: topic. Optional: area (default Staging).".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "topic": { "type": "string", "description": "Topic name" },
+                    "area": { "type": "string", "description": "Area name (default: Staging)" }
+                },
+                "required": ["topic"]
+            }),
+        },
+        // === Change Management ===
+        Tool {
+            name: "change_add".to_string(),
+            description: "Create a change folder inside a topic (does NOT modify the original spec). Writes proposal.md, optional design.md, <change>_spec.md, and <change>_task.md under spec/<area>/<topic>/changes/<change>/. Required: topic, change, proposal, spec_content, task_content. Optional: area (default Staging), design.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "topic": { "type": "string", "description": "Existing topic name" },
+                    "area": { "type": "string", "description": "Area name (default: Staging)" },
+                    "change": { "type": "string", "description": "Change identifier, e.g. 'add-2fa'" },
+                    "proposal": { "type": "string", "description": "Why this change is being added (≥ 11 chars)" },
+                    "design": { "type": "string", "description": "Optional technical approach" },
+                    "spec_content": { "type": "string", "description": "New requirements introduced by this change (≥ 11 chars)" },
+                    "task_content": { "type": "string", "description": "New tasks introduced by this change (≥ 11 chars)" }
+                },
+                "required": ["topic", "change", "proposal", "spec_content", "task_content"]
+            }),
+        },
+        Tool {
+            name: "change_list".to_string(),
+            description: "List all changes for a topic. Set include_archived=true to also list changes under changes/archive/.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "topic": { "type": "string", "description": "Topic name" },
+                    "area": { "type": "string", "description": "Area name (default: Staging)" },
+                    "include_archived": { "type": "boolean", "description": "Include archived changes (default: false)" }
+                },
+                "required": ["topic"]
+            }),
+        },
+        Tool {
+            name: "change_archive".to_string(),
+            description: "Mark a change as complete by moving it into changes/archive/.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "topic": { "type": "string", "description": "Topic name" },
+                    "area": { "type": "string", "description": "Area name (default: Staging)" },
+                    "change": { "type": "string", "description": "Change name to archive" }
+                },
+                "required": ["topic", "change"]
+            }),
+        },
         // === Index Actions (Bind) ===
         Tool {
             name: "index_add".to_string(),
